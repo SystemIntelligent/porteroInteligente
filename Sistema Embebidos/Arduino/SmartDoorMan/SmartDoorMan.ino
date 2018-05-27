@@ -9,6 +9,7 @@
 #define RST_PIN         9           // Pin reset RFID.
 #define SS_PIN          10          // Slave Select pin RFID.
 #define BUZZER          2           // pin Buzzer.
+#define PULSADOR        3
 //---------------------------------------------------------------------------//
 
 enum buzzerBeep {
@@ -21,6 +22,7 @@ enum msgDisplay {
   MSG_WELCOME = 0,
   MSG_APPROACH_CARD,
   MSG_CARD_IN_FIELD,
+  MSG_DING_DONG,
 };
 
 MFRC522 rfid(SS_PIN, RST_PIN);
@@ -33,6 +35,8 @@ bool  checkCardInField = false;
 bool  refreshDisplay = false;
 int   countAux0Timer = 0;  // contador auxiliar del timer usado para verificacion de tarjeta en campo.
 int   countAux1Timer = 0;   // contador auxiliar del timer usado para refrescar display;
+
+
 int   beepMode = 0;
 int   msgNumber;
 
@@ -43,6 +47,7 @@ void printMsg(int msgNumber);
 void setup() {
 
   pinMode(BUZZER, OUTPUT);
+  pinMode(PULSADOR, INPUT_PULLUP);
   Serial.begin(9600);
 
   lcd.init();                           // inicializacion del display
@@ -60,14 +65,20 @@ void setup() {
   printMsg(MSG_WELCOME);
   Serial.println(F("> Inicializacion finalizada"));
   delay(1500);
+  attachInterrupt(digitalPinToInterrupt(PULSADOR), ISR_HW, LOW);
 
 }
 
 void loop() {
-
+  
+  if (refreshDisplay == true) {
+    printMsg(msgNumber);
+    refreshDisplay = false;
+  }
+  
   if (checkCardInField == true) {
     checkCardInField = false;
-    if ( rfid.PICC_IsNewCardPresent()) {
+    if (rfid.PICC_IsNewCardPresent()) {
       Serial.println(F("\n> Tarjeta en Campo"));
       msgNumber = MSG_CARD_IN_FIELD;
       beepMode = ONE_BEEP_SHORT;
@@ -80,25 +91,37 @@ void loop() {
     }
   }
 
-  if (refreshDisplay == true) {
-    refreshDisplay = false;
-    printMsg(msgNumber);
-  }
+
 }
 
 //----------------------------------------------------------------------------//
 void printMsg(int msgNumber) {
   static int lastMsgNumber = 99;
+  static bool block = false;
+  static int blockCount = 0;
 
-  if (lastMsgNumber != msgNumber) {
+  if (block == true) {
+    blockCount++;
+    if (blockCount > 4) {
+      blockCount = 0;
+      block = false;
+    }
+  }
+
+  if ((lastMsgNumber != msgNumber) && block == false) {
     lastMsgNumber = msgNumber;
+    block = true;
+    blockCount = 0;
     switch (msgNumber) {
-      case 0: printDisplay("Portero", "    Inteligente");
+      case MSG_WELCOME: printDisplay("Portero", "    Inteligente");
         break;
-      case 1: printDisplay("Acerque su      ", "     Tarjeta ...");
+      case MSG_APPROACH_CARD: printDisplay("Acerque su      ", "     Tarjeta ...");
         break;
-      case 2: printDisplay("Tarjeta         ", "     en campo   ");
+      case MSG_CARD_IN_FIELD: printDisplay("Tarjeta         ", "     en campo!! ");
         break;
+      case MSG_DING_DONG: printDisplay("  Ding         ", "     Dong ...   ");
+        break;
+
     }
   }
 }
@@ -117,6 +140,11 @@ void refreshBuzzer(void) {
     digitalWrite(BUZZER, HIGH);
   else
     digitalWrite(BUZZER, LOW);
+}
+//-------------------------- Pulsador Handler -------------------------------//
+void ISR_HW() {
+  msgNumber = MSG_DING_DONG;
+  refreshDisplay = true;
 }
 //--------------------------- Timer Handler ---------------------------------//
 void ISR_TIMER(void) {
