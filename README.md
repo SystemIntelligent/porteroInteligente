@@ -5,6 +5,5 @@ La idea de los creadores es tener un equipo encargado de comunicación con el ce
 ## Integrantes
 * Leonardo Pastor
 * Julian Morganella
-* Lourdes Barrera
 * Ezequiel Valdez
 * Ezequiel Silvero
