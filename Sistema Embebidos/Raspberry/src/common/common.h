@@ -19,7 +19,7 @@ using namespace std;
 #include <iostream>
 #include <fcntl.h>
 #include <unistd.h>
-#include </soa/wiringPi/wiringPi.h>
-#include </soa/sqlite3/sqlite3.h>
+#include <wiringPi.h>
+#include <sqlite3.h>
 
 #endif /* SRC_COMMON_COMMON_H_ */
