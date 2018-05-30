@@ -9,7 +9,7 @@
 #define RST_PIN         9           // Pin reset RFID.
 #define SS_PIN          10          // Slave Select pin RFID.
 #define BUZZER          2           // pin Buzzer.
-#define PULSADOR        3
+#define PULSADOR        3           // pin Pulsador.
 //---------------------------------------------------------------------------//
 
 enum buzzerBeep {
@@ -40,9 +40,16 @@ int   countAux1Timer = 0;   // contador auxiliar del timer usado para refrescar 
 int   beepMode = 0;
 int   msgNumber;
 
+String inputString = "";
+bool stringComplete = false;
+
+//------------------------------- Prototipos de funciones --------------------------------//
+
 void refreshBuzzer(void);
 void printDisplay(const char *line1, const char *line2);
 void printMsg(int msgNumber);
+
+//----------------------------------------------------------------------------------------//
 
 void setup() {
 
@@ -66,16 +73,23 @@ void setup() {
   Serial.println(F("> Inicializacion finalizada"));
   delay(1500);
   attachInterrupt(digitalPinToInterrupt(PULSADOR), ISR_HW, LOW);
+  inputString.reserve(200);
 
 }
 
 void loop() {
-  
+
+  if (stringComplete){
+    stringComplete = false;
+    Serial.print("--- string recibido: ");
+    Serial.println(inputString);
+  }
+
   if (refreshDisplay == true) {
     printMsg(msgNumber);
     refreshDisplay = false;
   }
-  
+
   if (checkCardInField == true) {
     checkCardInField = false;
     if (rfid.PICC_IsNewCardPresent()) {
@@ -162,4 +176,15 @@ void ISR_TIMER(void) {
     refreshDisplay = true;
   }
 }
-//----------------------------------------------------------------------------//
+//-------------------------- Evento Serial Handler -------------------------//
+void serialEvent() {
+
+  while (Serial.available()) {
+    char inChar = (char)Serial.read();
+    inputString += inChar;
+    if (inChar == '\n') {
+      stringComplete = true;
+    }
+  }
+}
+
