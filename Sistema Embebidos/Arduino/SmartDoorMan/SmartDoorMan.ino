@@ -79,7 +79,7 @@ void setup() {
 
 void loop() {
 
-  if (stringComplete){
+  if (stringComplete) {
     stringComplete = false;
     Serial.print("--- string recibido: ");
     Serial.println(inputString);
@@ -178,11 +178,27 @@ void ISR_TIMER(void) {
 }
 //-------------------------- Evento Serial Handler -------------------------//
 void serialEvent() {
-
+  static int state = 0;
   while (Serial.available()) {
     char inChar = (char)Serial.read();
-    inputString += inChar;
-    if (inChar == '\n') {
+
+    if (inChar == 'I' && state == 0) {
+      state = 1;
+      inputString = inChar;
+    }
+
+    else if (state == 1 && inChar == 'I') {
+      state = 1;
+      inputString = inChar;
+    }
+
+    else if (state == 1 && inChar != 'D') {
+      inputString += inChar;
+    }
+
+    else if (state == 1 && inChar == 'D') {
+      inputString += inChar;
+      state = 0;
       stringComplete = true;
     }
   }
