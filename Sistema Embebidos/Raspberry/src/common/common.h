@@ -22,4 +22,9 @@ using namespace std;
 #include <wiringPi.h>
 #include <sqlite3.h>
 
+#define TRUE 1
+#define FALSE 0
+
 #endif /* SRC_COMMON_COMMON_H_ */
+
+
