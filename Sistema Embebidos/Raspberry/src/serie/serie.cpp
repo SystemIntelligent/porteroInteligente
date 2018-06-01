@@ -11,74 +11,80 @@
 
 #include <wiringSerial.h>
 
-int fd=0;
+int fd = 0;
 char vectorRecibido[256];
 int tamanoRecibido;
-int disponibleRec=TRUE;
+int disponibleRec = TRUE;
 
-static char* checksum(char * p){
+
+static char* checksum(char * p, int length) {
 	int resultado;	//YO
 	char tmp[3];	//YO
-	char * pi= p;		//YO
-	while (*p!='*' && *p != '\0' && (p - pi) < 100) {
-				resultado = resultado ^ *p;
-				p++;
-			}
+	char * pi = p;		//YO
 
-			if (resultado <= 15) {
-				if (resultado <= 9) {
-					tmp[0] = '0';
-					tmp[1] = resultado + 48;
-					tmp[2] = '\0';
-				} else {
-					tmp[0] = '0';
-					tmp[1] = resultado + 87;
-					tmp[2] = '\0';
+	for (int idx = 0; idx < length; idx++) {
+		resultado = resultado ^ p[idx];
+	}
 
-				}
-			} else {
+	if (resultado <= 15) {
+		if (resultado <= 9) {
+			tmp[0] = '0';
+			tmp[1] = resultado + 48;
+			tmp[2] = '\0';
+		} else {
+			tmp[0] = '0';
+			tmp[1] = resultado + 87;
+			tmp[2] = '\0';
 
-				int resto;
-				int cociente;
-				char numHexa[] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-						'a', 'b', 'c', 'd', 'e', 'f' };
+		}
+	} else {
 
-				resto = resultado % 16;
-				cociente = resultado / 16;
-				tmp[2] = '\0';
-				tmp[1] = numHexa[resto];
-				tmp[0] = numHexa[cociente];
+		int resto;
+		int cociente;
+		char numHexa[] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+				'a', 'b', 'c', 'd', 'e', 'f' };
 
-			}
+		resto = resultado % 16;
+		cociente = resultado / 16;
+		tmp[2] = '\0';
+		tmp[1] = numHexa[resto];
+		tmp[0] = numHexa[cociente];
 
-			return tmp;
+	}
+
+	return tmp;
 }
 
 static void *eventoSerial(void *arg) {
 	serie::CallBack_t pfuncion = (serie::CallBack_t) arg;
-	while (true){
-		int cant=serialDataAvail (fd);
-		if(cant!=0 || disponibleRec==TRUE){
-			tamanoRecibido=cant;
-			int flagInit=FALSE,flagFin=FALSE;
-			for (int i = 0; i < cant; i++) {
-				char aux= serialGetchar(fd);
-				if(aux==INICIO_DAT && flagFin==FALSE){
-					flagInit=TRUE;
-				}else{
-					if(flagInit==TRUE){
-						if(aux==FIN_DAT){
+	while (true) {
+		int cant = serialDataAvail(fd);
+		if (cant != 0 || disponibleRec == TRUE) {
+			tamanoRecibido = cant;
+			int flagInit = FALSE, flagFin = FALSE;
+//			for (int i = 0; i < cant; i++) {
+			int i;
+			while(cant!=0){
+				char aux = serialGetchar(fd);
+				if (aux == INICIO_DAT && flagFin == FALSE) {
+					flagInit = TRUE;
+					i=0;
+				} else {
+					if (flagInit == TRUE) {
+						if (aux == FIN_DAT) {
 							//Terminó
-							flagInit=FALSE;
+							flagInit = FALSE;
 							if (pfuncion != NULL)
-								pfuncion(vectorRecibido,tamanoRecibido);
+								pfuncion(vectorRecibido, i);
 
-						}else{
-							vectorRecibido[i]=aux;
+						} else {
+							vectorRecibido[i] = aux;
 							printf(" -> %3d", vectorRecibido[i]);
+							i++;
 						}
 					}
 				}
+				cant--;
 			}
 		}
 	}
@@ -86,33 +92,34 @@ static void *eventoSerial(void *arg) {
 }
 
 int serie::init(CallBack_t funcion) {
-	if(fd!=0)
+	if (fd != 0)
 		return FALSE;
 
-	if ((fd = serialOpen ("/dev/ttyAMA0", 115200)) < 0){
-	    fprintf (stderr, "No pudo abrirse el puerto serial: %s\n", strerror (errno)) ;
-	    return FALSE ;
-	}else{
-		if (wiringPiSetup () == -1){
-		    fprintf (stdout, "No pudo iniciarse wiringPi: %s\n", strerror (errno)) ;
-		    return FALSE ;
+	if ((fd = serialOpen("/dev/ttyAMA0", 115200)) < 0) {
+		fprintf(stderr, "No pudo abrirse el puerto serial: %s\n",
+				strerror(errno));
+		return FALSE;
+	} else {
+		if (wiringPiSetup() == -1) {
+			fprintf(stdout, "No pudo iniciarse wiringPi: %s\n",
+					strerror(errno));
+			return FALSE;
 		}
 	}
 	pthread_t threadId;
-	int err = pthread_create(&threadId, NULL, eventoSerial, &funcion);	//eventoSerial es donde se fija si hay un mensaje.
+	int err = pthread_create(&threadId, NULL, eventoSerial, &funcion);//eventoSerial es donde se fija si hay un mensaje.
 	if (err != 0) {
 		printf("Error al crear Hilo.");
-		fd=0;
+		fd = 0;
 		return FALSE;
 	}
 	return TRUE;
 }
 
-
-int serie::prepare_pack(char * vec, int tam){
-	if(fd!=0)
+int serie::prepare_pack(char * vec, int tam) {
+	if (fd != 0)
 		return FALSE;
-	char vectorTransmit[tam+7];
+	char vectorTransmit[tam + 7];
 //	vectorTransmit[0]=INICIO_DAT;
 //	vectorTransmit[1]=SEPARADOR;
 //
@@ -122,14 +129,14 @@ int serie::prepare_pack(char * vec, int tam){
 //	vectorTransmit[(tam+1)]=FIN_DAT;
 
 	//hace CHecksum
-	char * tmp =checksum(vec);
+	char * tmp = checksum(vec, tam);
 	//ojo '/0'
-	sprintf((char*)vectorTransmit, "%c%c%s%c%02s%c%c",INICIO_DAT,SEPARADOR,vec,SEPARADOR,tmp,SEPARADOR,FIN_DAT);
+	sprintf((char*) vectorTransmit, "%c%c%s%c%s%c%c", INICIO_DAT, SEPARADOR,
+			vec, SEPARADOR, tmp, SEPARADOR, FIN_DAT);
 //		vectorTransmit[(tam-2)]=tmp[0];//Parte alta checkSum
 //		vectorTransmit[(tam-1)]=tmp[1];//Parte baja checkSum
 	serialPrintf(fd, vectorTransmit);
 
 	return TRUE;
 }
-
 
