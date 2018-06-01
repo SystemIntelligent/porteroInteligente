@@ -15,11 +15,42 @@ int fd=0;
 char vectorRecibido[256];
 int tamanoRecibido;
 int disponibleRec=TRUE;
+char tmp[3];	//YO
 
+static void checksum(char * p){
+	int resultado;	//YO
+	char * pi= p;		//YO
+	while (*p!='*' && *p != '\0' && (p - pi) < 100) {
+				resultado = resultado ^ *p;
+				p++;
+			}
 
-static int checksum(char * vec){
-	return 1;
-	}
+			if (resultado <= 15) {
+				if (resultado <= 9) {
+					tmp[0] = '0';
+					tmp[1] = resultado + 48;
+					tmp[2] = '\0';
+				} else {
+					tmp[0] = '0';
+					tmp[1] = resultado + 87;
+					tmp[2] = '\0';
+
+				}
+			} else {
+
+				int resto;
+				int cociente;
+				char numHexa[] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+						'a', 'b', 'c', 'd', 'e', 'f' };
+
+				resto = resultado % 16;
+				cociente = resultado / 16;
+				tmp[2] = '\0';
+				tmp[1] = numHexa[resto];
+				tmp[0] = numHexa[cociente];
+
+			}
+}
 
 static void *eventoSerial(void *arg) {
 	serie::CallBack_t pfuncion = (serie::CallBack_t) arg;
@@ -79,20 +110,21 @@ int serie::init(CallBack_t funcion) {
 int serie::prepare_pack(char * vec, int tam){
 	if(fd!=0)
 		return FALSE;
-	int sum;
 	char vectorTransmit[tam+2];
-	vectorTransmit[0]=INICIO_DAT;
-	vectorTransmit[1]=SEPARADOR;
-
-	vectorTransmit[(tam-3)]=SEPARADOR;
-
-	vectorTransmit[tam]=SEPARADOR;
-	vectorTransmit[(tam+1)]=FIN_DAT;
+//	vectorTransmit[0]=INICIO_DAT;
+//	vectorTransmit[1]=SEPARADOR;
+//
+//	vectorTransmit[(tam-3)]=SEPARADOR;
+//
+//	vectorTransmit[tam]=SEPARADOR;
+//	vectorTransmit[(tam+1)]=FIN_DAT;
 
 	//hace CHecksum
-	sum=checksum(vec);
-	//	vectorTransmit[(tam-2)]=//Parte alta checkSum
-	//	vectorTransmit[(tam-1)]=//Parte baja checkSum
+	checksum(vec);
+	//ojo /0
+	sprintf((char*)vectorTransmit, "%c%c%s%c%s%c%c",INICIO_DAT,SEPARADOR,vec,SEPARADOR,tmp,SEPARADOR,FIN_DAT);
+//		vectorTransmit[(tam-2)]=tmp[0];//Parte alta checkSum
+//		vectorTransmit[(tam-1)]=tmp[1];//Parte baja checkSum
 	serialPrintf(fd, vectorTransmit);
 
 	return TRUE;
