@@ -1,4 +1,3 @@
-
 #include <SPI.h>
 #include <MFRC522.h>
 #include <TimerOne.h>
@@ -6,25 +5,26 @@
 #include <LiquidCrystal_I2C.h>
 
 #ifndef DELIMITER_CHARACTER
-#define DELIMITER_CHARACTER (int8_t)0xAE
-//#define DELIMITER_CHARACTER '|'
+//#define DELIMITER_CHARACTER (int8_t)0xAE
+#define DELIMITER_CHARACTER '|'
 #endif
 
 #ifndef START_CHARACTER
-#define START_CHARACTER (int8_t)0x91
-//#define START_CHARACTER 'S'
+//#define START_CHARACTER (int8_t)0x91
+#define START_CHARACTER 'S'
 #endif
 
 #ifndef END_CHARACTER
-#define END_CHARACTER (int8_t)0x92
-//#define END_CHARACTER 'F'
+//#define END_CHARACTER (int8_t)0x92
+#define END_CHARACTER 'F'
 #endif
 
 #ifndef PACKAGE_FORMAT
 #define PACKAGE_FORMAT "%c%c%s%c%s%c%c" //start character + delimiter character + payLoad + delimiter character + checksum + delimiter character + end character.
 #endif
 
-#define SIZE_PACKAGE     250
+#define SIZE_PAYLOAD     40
+#define SIZE_PACKAGE     SIZE_PAYLOAD + 7
 #define SIZE_CHECKSUM    3
 
 
@@ -40,6 +40,7 @@ enum buzzerBeep {
   TWO_BEEP_SHORT = 0b01010000,
   THREE_BEEP_SHORT = 0b01010100,
 };
+
 
 enum msgDisplay {
   MSG_WELCOME = 0,
@@ -63,19 +64,20 @@ int   countAux1Timer = 0;   // contador auxiliar del timer usado para refrescar 
 int   beepMode = 0;
 int   msgNumber;
 
-String inputString = "";
-bool stringComplete = false;
+String receivedPackage = "";
+bool packageComplete = false;
 
 //------------------------------- Prototipos de funciones --------------------------------//
 
 void  refreshBuzzer(void);
 void  printDisplay(const char *line1, const char *line2);
 void  printMsg(int msgNumber);
-char* calcChecksum(const char *data, int length);
-char* preparePackage(const char *payLoad, int length);
+char  *calcChecksum(const char *data, int length);
+char  *preparePackage(const char *payLoad, int length);
 bool  compareChecksum(const char *checksumA, const char *checksumB);
-char* getChecksumFromReceivedPackage(const char *package, int length);
+char  *getChecksumFromReceivedPackage(const char *package, int length);
 bool  validatePackage(const char *package, int length);
+char  *disarmPackage(const char *package, int length);
 
 //----------------------------------------------------------------------------------------//
 
@@ -98,32 +100,46 @@ void setup() {
   Timer1.attachInterrupt(ISR_TIMER);    // Iterrupt Request Service del Timer.
 
   printMsg(MSG_WELCOME);
-  Serial.println(F("> Inicializacion finalizada"));
-  delay(1500);
+  Serial.println(F("> Inicializacion finalizada."));
   attachInterrupt(digitalPinToInterrupt(PULSADOR), ISR_HW, LOW);
-  inputString.reserve(200);
-  //char temp[] = "GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,";
-  char temp[] = "HolaJuu";
-  
-  char temp1[250];
-  strcpy(temp1, preparePackage(temp, sizeof(temp)));
-  Serial.println(temp1);
-  for(int i = 0; i < strlen(temp1); i++){
-    Serial.print(temp1[i],16);
-    Serial.print(" ");
-  }
-  Serial.println("");
+  receivedPackage.reserve(200);
+  char msg[] = "ho ho ho i have a machine gun!!!";
 
-  Serial.println(getChecksumFromReceivedPackage(temp1, strlen(temp1)));
-  Serial.println(validatePackage(temp1,strlen(temp1)));
+  char pakage[SIZE_PACKAGE];
+  char payLoad[SIZE_PAYLOAD];
+  Serial.print(F("\npayLoad: "));
+  Serial.println(msg);
+  Serial.print(F("Package: "));
+  strcpy(pakage, preparePackage(msg, strlen(msg)));
+  Serial.println(pakage);
+  /*
+    Serial.print(F("Checksum is Valid ?: "));
+    Serial.println(validatePackage(pakage, strlen(pakage)));
+    strcpy(payLoad, disarmPackage(pakage, strlen(pakage)));
+
+    Serial.print(F("\npayLoad Disarmed: "));
+    Serial.println(payLoad);
+  */
 }
 
 void loop() {
 
-  if (stringComplete) {
-    stringComplete = false;
-    Serial.print("--- string recibido: ");
-    Serial.println(inputString);
+  if (packageComplete) {
+    packageComplete = false;
+    Serial.print(F("\n> Recieved Package: "));
+    Serial.println(receivedPackage);
+    char  recievedPack[SIZE_PACKAGE];
+    char  payLoad[SIZE_PAYLOAD];
+    receivedPackage.toCharArray(recievedPack, sizeof(recievedPack));
+    if (validatePackage(recievedPack, strlen(recievedPack))) {
+      Serial.println(F("> Checksum valid!!"));
+      strcpy(payLoad, disarmPackage(recievedPack, strlen(recievedPack)));
+      Serial.print(F("> PayLoad Disarmed: "));
+      Serial.println(payLoad);
+    }
+    else {
+      Serial.println(F("> Error bad Checksum !!"));
+    }
   }
 
   if (refreshDisplay == true) {
@@ -155,9 +171,10 @@ void printMsg(int msgNumber) {
   static bool block = false;
   static int blockCount = 0;
 
+
   if (block == true) {
     blockCount++;
-    if (blockCount > 4) {
+    if (blockCount > 5) {
       blockCount = 0;
       block = false;
     }
@@ -222,41 +239,35 @@ void ISR_TIMER(void) {
 void serialEvent() {
 
   static int state = 0;
-  while (Serial.available()) {
+  if (Serial.available()) {
     char inChar = (char)Serial.read();
 
     if (inChar == START_CHARACTER && state == 0) {
       state = 1;
-      inputString = inChar;
+      receivedPackage = inChar;
     }
 
     else if (inChar == START_CHARACTER && state == 1) {
       state = 1;
-      inputString = inChar;
+      receivedPackage = inChar;
     }
 
     else if (inChar != END_CHARACTER && state == 1) {
-      inputString += inChar;
+      receivedPackage += inChar;
     }
 
     else if (inChar == END_CHARACTER && state == 1) {
-      inputString += inChar;
+      receivedPackage += inChar;
       state = 0;
-      stringComplete = true;
+      packageComplete = true;
     }
   }
 }
 //--------------------------------------------------------------------------//
 char* calcChecksum(const char *data, int length) {
 
-  for(int i = 0; i < length; i++){
-    Serial.print(data[i],16);
-    Serial.print(" ");
-  }
-  Serial.println("");
-  
   static char checksum[SIZE_CHECKSUM];
-  unsigned int result = 0;
+  int result = 0;
 
   for (int idx = 0; idx < length; idx ++) {
     result = result ^ data[idx];
@@ -284,14 +295,10 @@ char* calcChecksum(const char *data, int length) {
     checksum[1] = numHexa[rest];
     checksum[0] = numHexa[quotient];
   }
-  for(int i = 0; i < 3; i++){
-    Serial.print(checksum[i],16);
-    Serial.print(" ");
-  }
-  Serial.println("");
+
   return checksum;
- 
-  
+
+
 }
 //--------------------------------------------------------------------------//
 char *preparePackage(const char *payLoad, int length) {
@@ -307,7 +314,7 @@ char *preparePackage(const char *payLoad, int length) {
 bool compareChecksum(const char *checksumA, const char *checksumB) {
   bool result = true;
 
-  for (int idx = 0; idx < 3; idx++) {
+  for (int idx = 0; idx < SIZE_CHECKSUM; idx++) {
     if (checksumA[idx] != checksumB[idx]) {
       result = false;
     }
@@ -342,10 +349,18 @@ char *getChecksumFromReceivedPackage(const char *package, int length) {
 }
 //--------------------------------------------------------------------------//
 bool validatePackage(const char *package, int length) {
-  
-  return compareChecksum(getChecksumFromReceivedPackage(package, length), calcChecksum(package + 2, length - 7)); 
+
+  return compareChecksum(getChecksumFromReceivedPackage(package, length), calcChecksum(package + 2, length - 7));
   // + 2 para saltearme el start_character y el -7 es (caracter de inicio + primer delimitador + 1 delimitador antes del checksum +  2 caracteres del checksum + ultimo delimitador
-  // + caracter de fin.   
+  // + caracter de fin.
 
 }
+//--------------------------------------------------------------------------//
+char *disarmPackage(const char *package, int length) {
+  static char payLoad[SIZE_PAYLOAD];
+  memcpy(payLoad, package + 2, (length - 7 )*sizeof(char)); // +3 para salterame el caracter inicial(1) + primer delimitador(1); -7 para no copiar caracter de inicio
+  // de paquete(1), primer delimitador(1), delimitador antes del checksum(1) el checksum(2) el limitador despues del checksum(1) y el caracter de fin de paquete(1).
+  return payLoad;
+}
+
 
