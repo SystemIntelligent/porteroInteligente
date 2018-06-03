@@ -4,35 +4,32 @@
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 
-#ifndef DELIMITER_CHARACTER
-//#define DELIMITER_CHARACTER (int8_t)0xAE
+#define DEBUG
+
+#ifdef  DEBUG
 #define DELIMITER_CHARACTER '|'
-#endif
-
-#ifndef START_CHARACTER
-//#define START_CHARACTER (int8_t)0x91
 #define START_CHARACTER 'S'
-#endif
-
-#ifndef END_CHARACTER
-//#define END_CHARACTER (int8_t)0x92
 #define END_CHARACTER 'F'
 #endif
 
-#ifndef PACKAGE_FORMAT
-#define PACKAGE_FORMAT "%c%c%s%c%s%c%c" //start character + delimiter character + payLoad + delimiter character + checksum + delimiter character + end character.
+#ifndef DEBUG
+#define DELIMITER_CHARACTER (int8_t)0xAE
+#define START_CHARACTER (int8_t)0x91
+#define END_CHARACTER (int8_t)0x92
 #endif
 
+
+#define PACKAGE_FORMAT "%c%c%s%c%s%c%c" //start character + delimiter character + payLoad + delimiter character + checksum + delimiter character + end character.
 #define SIZE_PAYLOAD     40
 #define SIZE_PACKAGE     SIZE_PAYLOAD + 7
 #define SIZE_CHECKSUM    3
 
 
 // ---------------------- Definicion de Pines -------------------------------//
-#define RST_PIN         9           // Pin reset RFID.
-#define SS_PIN          10          // Slave Select pin RFID.
-#define BUZZER          2           // pin Buzzer.
-#define PULSADOR        3           // pin Pulsador.
+#define RST_PIN          9           // Pin reset RFID.
+#define SS_PIN           10          // Slave Select pin RFID.
+#define BUZZER           2           // pin Buzzer.
+#define PULSADOR         3           // pin Pulsador.
 //---------------------------------------------------------------------------//
 
 enum buzzerBeep {
@@ -47,6 +44,16 @@ enum msgDisplay {
   MSG_APPROACH_CARD,
   MSG_CARD_IN_FIELD,
   MSG_DING_DONG,
+};
+
+enum commands {
+  OPEN_DOOR = 1,                 // comando recibido desde las raspberry.
+  ACK_OPEN_DOOR,                 // ack enviado dede arduino a raspberry.
+  BUTTON_PRESSED,                // comando enviado (cuando se pulsa el timbre) desde arduino a raspberry.
+  ACK_BUTTON_PRESSED,            // ack recibido desde la raspberry.
+  VALIDATE_CARD,                 // comando enviado (cuando se requiere validar una tarjeta) desde arduino a raspberry.
+  CARD_VALID,                    // comando recibido desde la raspberry.
+  CARD_NOT_VALID,                // comando recibido desde la raspberry. 
 };
 
 MFRC522 rfid(SS_PIN, RST_PIN);
@@ -174,7 +181,7 @@ void printMsg(int msgNumber) {
 
   if (block == true) {
     blockCount++;
-    if (blockCount > 5) {
+    if (blockCount > 3) {
       blockCount = 0;
       block = false;
     }
@@ -223,7 +230,7 @@ void ISR_TIMER(void) {
   refreshBuzzer();
 
   countAux0Timer++;
-  if (countAux0Timer == 15) {
+  if (countAux0Timer == 7) {
     countAux0Timer = 0;
     checkCardInField = true;
   }
@@ -362,5 +369,6 @@ char *disarmPackage(const char *package, int length) {
   // de paquete(1), primer delimitador(1), delimitador antes del checksum(1) el checksum(2) el limitador despues del checksum(1) y el caracter de fin de paquete(1).
   return payLoad;
 }
+
 
 
