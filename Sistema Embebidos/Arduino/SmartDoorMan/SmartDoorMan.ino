@@ -10,12 +10,14 @@
 #define DELIMITER_CHARACTER '|'
 #define START_CHARACTER 'S'
 #define END_CHARACTER 'F'
+#define SERIAL_PRINT(x,y)        Serial.print(x);Serial.println(y);
 #endif
 
 #ifndef DEBUG
 #define DELIMITER_CHARACTER (int8_t)0xAE
 #define START_CHARACTER (int8_t)0x91
 #define END_CHARACTER (int8_t)0x92
+#define SERIAL_PRINT(x,y)
 #endif
 
 
@@ -53,7 +55,7 @@ enum commands {
   ACK_BUTTON_PRESSED,            // ack recibido desde la raspberry.
   VALIDATE_CARD,                 // comando enviado (cuando se requiere validar una tarjeta) desde arduino a raspberry.
   CARD_VALID,                    // comando recibido desde la raspberry.
-  CARD_NOT_VALID,                // comando recibido desde la raspberry. 
+  CARD_NOT_VALID,                // comando recibido desde la raspberry.
 };
 
 MFRC522 rfid(SS_PIN, RST_PIN);
@@ -107,18 +109,17 @@ void setup() {
   Timer1.attachInterrupt(ISR_TIMER);    // Iterrupt Request Service del Timer.
 
   printMsg(MSG_WELCOME);
-  Serial.println(F("> Inicializacion finalizada."));
+  SERIAL_PRINT(F("\n> Inicialización finalizada."),"");
   attachInterrupt(digitalPinToInterrupt(PULSADOR), ISR_HW, LOW);
   receivedPackage.reserve(200);
   char msg[] = "ho ho ho i have a machine gun!!!";
 
   char pakage[SIZE_PACKAGE];
   char payLoad[SIZE_PAYLOAD];
-  Serial.print(F("\npayLoad: "));
-  Serial.println(msg);
-  Serial.print(F("Package: "));
+  SERIAL_PRINT(F("\npayLoad: "), msg);
   strcpy(pakage, preparePackage(msg, strlen(msg)));
-  Serial.println(pakage);
+  SERIAL_PRINT(F("Package: "), pakage);
+
   /*
     Serial.print(F("Checksum is Valid ?: "));
     Serial.println(validatePackage(pakage, strlen(pakage)));
@@ -133,19 +134,17 @@ void loop() {
 
   if (packageComplete) {
     packageComplete = false;
-    Serial.print(F("\n> Recieved Package: "));
-    Serial.println(receivedPackage);
+    SERIAL_PRINT(F("\n> Recieved Package: "), receivedPackage);
     char  recievedPack[SIZE_PACKAGE];
     char  payLoad[SIZE_PAYLOAD];
     receivedPackage.toCharArray(recievedPack, sizeof(recievedPack));
     if (validatePackage(recievedPack, strlen(recievedPack))) {
-      Serial.println(F("> Checksum valid!!"));
+      SERIAL_PRINT(F("> Checksum valid!!"), "");
       strcpy(payLoad, disarmPackage(recievedPack, strlen(recievedPack)));
-      Serial.print(F("> PayLoad Disarmed: "));
-      Serial.println(payLoad);
+      SERIAL_PRINT(F("> PayLoad Disarmed: "), payLoad);
     }
     else {
-      Serial.println(F("> Error bad Checksum !!"));
+      SERIAL_PRINT(F("> Error bad Checksum !!"), "");
     }
   }
 
@@ -157,7 +156,7 @@ void loop() {
   if (checkCardInField == true) {
     checkCardInField = false;
     if (rfid.PICC_IsNewCardPresent()) {
-      Serial.println(F("\n> Tarjeta en Campo"));
+      SERIAL_PRINT(F("\n> Tarjeta en Campo"), "");
       msgNumber = MSG_CARD_IN_FIELD;
       beepMode = ONE_BEEP_SHORT;
       if ( rfid.PICC_ReadCardSerial()) {
