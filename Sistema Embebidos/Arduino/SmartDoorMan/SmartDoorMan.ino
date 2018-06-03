@@ -20,7 +20,7 @@
 #define SERIAL_PRINT(x,y)
 #endif
 
-
+#define ERROR_CODE      (-1)
 #define PACKAGE_FORMAT "%c%c%s%c%s%c%c" //start character + delimiter character + payLoad + delimiter character + checksum + delimiter character + end character.
 #define SIZE_PAYLOAD     40
 #define SIZE_PACKAGE     SIZE_PAYLOAD + 7
@@ -87,6 +87,8 @@ bool  compareChecksum(const char *checksumA, const char *checksumB);
 char  *getChecksumFromReceivedPackage(const char *package, int length);
 bool  validatePackage(const char *package, int length);
 char  *disarmPackage(const char *package, int length);
+int   disarmPayLoad(const char *payLoad, int length, char *data);
+int   proccesPackage(String package, int length);
 
 //----------------------------------------------------------------------------------------//
 
@@ -109,10 +111,10 @@ void setup() {
   Timer1.attachInterrupt(ISR_TIMER);    // Iterrupt Request Service del Timer.
 
   printMsg(MSG_WELCOME);
-  SERIAL_PRINT(F("\n> Inicialización finalizada."),"");
+  SERIAL_PRINT(F("\n> Inicialización finalizada."), "");
   attachInterrupt(digitalPinToInterrupt(PULSADOR), ISR_HW, LOW);
   receivedPackage.reserve(200);
-  char msg[] = "ho ho ho i have a machine gun!!!";
+  char msg[] = "06|--datos--";
 
   char pakage[SIZE_PACKAGE];
   char payLoad[SIZE_PAYLOAD];
@@ -134,18 +136,7 @@ void loop() {
 
   if (packageComplete) {
     packageComplete = false;
-    SERIAL_PRINT(F("\n> Recieved Package: "), receivedPackage);
-    char  recievedPack[SIZE_PACKAGE];
-    char  payLoad[SIZE_PAYLOAD];
-    receivedPackage.toCharArray(recievedPack, sizeof(recievedPack));
-    if (validatePackage(recievedPack, strlen(recievedPack))) {
-      SERIAL_PRINT(F("> Checksum valid!!"), "");
-      strcpy(payLoad, disarmPackage(recievedPack, strlen(recievedPack)));
-      SERIAL_PRINT(F("> PayLoad Disarmed: "), payLoad);
-    }
-    else {
-      SERIAL_PRINT(F("> Error bad Checksum !!"), "");
-    }
+    proccesPackage(receivedPackage, receivedPackage.length());
   }
 
   if (refreshDisplay == true) {
@@ -311,7 +302,7 @@ char *preparePackage(const char *payLoad, int length) {
 
   char checksum[SIZE_CHECKSUM];
   memcpy(checksum, calcChecksum(payLoad, length), 3 * sizeof(char));
-
+  checksum[2] = '\0';
   static char package[SIZE_PACKAGE];
   snprintf(package, sizeof(package), PACKAGE_FORMAT, START_CHARACTER, DELIMITER_CHARACTER, payLoad, DELIMITER_CHARACTER, checksum, DELIMITER_CHARACTER, END_CHARACTER);
   return package;
@@ -342,7 +333,6 @@ char *getChecksumFromReceivedPackage(const char *package, int length) {
   }
 
   if (!findOK) {
-    Serial.println("out");
     return NULL;
   }
 
@@ -366,8 +356,52 @@ char *disarmPackage(const char *package, int length) {
   static char payLoad[SIZE_PAYLOAD];
   memcpy(payLoad, package + 2, (length - 7 )*sizeof(char)); // +3 para salterame el caracter inicial(1) + primer delimitador(1); -7 para no copiar caracter de inicio
   // de paquete(1), primer delimitador(1), delimitador antes del checksum(1) el checksum(2) el limitador despues del checksum(1) y el caracter de fin de paquete(1).
+  payLoad[length - 7] = '\0';
   return payLoad;
 }
+//--------------------------------------------------------------------------//
+int disarmPayLoad(const char *payLoad, int length, char *data) {
 
+  char command[3];
+  memcpy(command, payLoad, 2 * sizeof(char));
+  command[2] = '\0';
+
+  int cmd = atoi(command);
+  if (cmd > 0 && cmd < 8) {
+    if (cmd == 6) {  // unico comando proveniente desde la raspberry con datos;
+      memcpy (data, payLoad + 3, (length - 3)*sizeof(char));
+      data[length - 3] = '\0';
+    }
+    return cmd;
+  }
+  return ERROR_CODE; //retCode error;
+}
+//--------------------------------------------------------------------------//
+int proccesPackage(String package, int length) {
+
+  SERIAL_PRINT(F("\n> Recieved Package: "), package);
+  char  recievedPack[SIZE_PACKAGE];
+  char  payLoad[SIZE_PAYLOAD];
+  package.toCharArray(recievedPack, sizeof(recievedPack));
+  if (validatePackage(recievedPack, strlen(recievedPack))) {
+    SERIAL_PRINT(F("> Checksum valid!!"), "");
+    strcpy(payLoad, disarmPackage(recievedPack, strlen(recievedPack)));
+    SERIAL_PRINT(F("> PayLoad Disarmed: "), payLoad);
+    char data[50];
+    int command = disarmPayLoad(payLoad, strlen(payLoad), data);
+    if (command != -1) {
+      SERIAL_PRINT(F("> Command: "), command);
+      SERIAL_PRINT(F("> Data: "), data);
+      return command;
+    }
+    else {
+      return ERROR_CODE;
+    }
+  }
+  else {
+    SERIAL_PRINT(F("> Error bad Checksum !!"), "");
+    return ERROR_CODE;
+  }
+}
 
 
