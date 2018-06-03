@@ -5,6 +5,29 @@
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 
+#ifndef DELIMITER_CHARACTER
+#define DELIMITER_CHARACTER (int8_t)0xAE
+//#define DELIMITER_CHARACTER '|'
+#endif
+
+#ifndef START_CHARACTER
+#define START_CHARACTER (int8_t)0x91
+//#define START_CHARACTER 'S'
+#endif
+
+#ifndef END_CHARACTER
+#define END_CHARACTER (int8_t)0x92
+//#define END_CHARACTER 'F'
+#endif
+
+#ifndef PACKAGE_FORMAT
+#define PACKAGE_FORMAT "%c%c%s%c%s%c%c" //start character + delimiter character + payLoad + delimiter character + checksum + delimiter character + end character.
+#endif
+
+#define SIZE_PACKAGE     250
+#define SIZE_CHECKSUM    3
+
+
 // ---------------------- Definicion de Pines -------------------------------//
 #define RST_PIN         9           // Pin reset RFID.
 #define SS_PIN          10          // Slave Select pin RFID.
@@ -45,9 +68,14 @@ bool stringComplete = false;
 
 //------------------------------- Prototipos de funciones --------------------------------//
 
-void refreshBuzzer(void);
-void printDisplay(const char *line1, const char *line2);
-void printMsg(int msgNumber);
+void  refreshBuzzer(void);
+void  printDisplay(const char *line1, const char *line2);
+void  printMsg(int msgNumber);
+char* calcChecksum(const char *data, int length);
+char* preparePackage(const char *payLoad, int length);
+bool  compareChecksum(const char *checksumA, const char *checksumB);
+char* getChecksumFromReceivedPackage(const char *package, int length);
+bool  validatePackage(const char *package, int length);
 
 //----------------------------------------------------------------------------------------//
 
@@ -74,7 +102,20 @@ void setup() {
   delay(1500);
   attachInterrupt(digitalPinToInterrupt(PULSADOR), ISR_HW, LOW);
   inputString.reserve(200);
+  //char temp[] = "GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,";
+  char temp[] = "HolaJuu";
+  
+  char temp1[250];
+  strcpy(temp1, preparePackage(temp, sizeof(temp)));
+  Serial.println(temp1);
+  for(int i = 0; i < strlen(temp1); i++){
+    Serial.print(temp1[i],16);
+    Serial.print(" ");
+  }
+  Serial.println("");
 
+  Serial.println(getChecksumFromReceivedPackage(temp1, strlen(temp1)));
+  Serial.println(validatePackage(temp1,strlen(temp1)));
 }
 
 void loop() {
@@ -176,31 +217,135 @@ void ISR_TIMER(void) {
     refreshDisplay = true;
   }
 }
+
 //-------------------------- Evento Serial Handler -------------------------//
 void serialEvent() {
+
   static int state = 0;
   while (Serial.available()) {
     char inChar = (char)Serial.read();
 
-    if (inChar == 'I' && state == 0) {
+    if (inChar == START_CHARACTER && state == 0) {
       state = 1;
       inputString = inChar;
     }
 
-    else if (state == 1 && inChar == 'I') {
+    else if (inChar == START_CHARACTER && state == 1) {
       state = 1;
       inputString = inChar;
     }
 
-    else if (state == 1 && inChar != 'D') {
+    else if (inChar != END_CHARACTER && state == 1) {
       inputString += inChar;
     }
 
-    else if (state == 1 && inChar == 'D') {
+    else if (inChar == END_CHARACTER && state == 1) {
       inputString += inChar;
       state = 0;
       stringComplete = true;
     }
   }
+}
+//--------------------------------------------------------------------------//
+char* calcChecksum(const char *data, int length) {
+
+  for(int i = 0; i < length; i++){
+    Serial.print(data[i],16);
+    Serial.print(" ");
+  }
+  Serial.println("");
+  
+  static char checksum[SIZE_CHECKSUM];
+  unsigned int result = 0;
+
+  for (int idx = 0; idx < length; idx ++) {
+    result = result ^ data[idx];
+  }
+
+  if (result <= 15) {
+    if (result <= 9) {
+      checksum[0] = '0';
+      checksum[1] = result + 48;
+      checksum[2] = '\0';
+    } else {
+      checksum[0] = '0';
+      checksum[1] = result + 87;
+      checksum[2] = '\0';
+
+    }
+  } else {
+
+    int rest;
+    int quotient;
+    char numHexa[] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+    rest = result % 16;
+    quotient = result / 16;
+    checksum[2] = '\0';
+    checksum[1] = numHexa[rest];
+    checksum[0] = numHexa[quotient];
+  }
+  for(int i = 0; i < 3; i++){
+    Serial.print(checksum[i],16);
+    Serial.print(" ");
+  }
+  Serial.println("");
+  return checksum;
+ 
+  
+}
+//--------------------------------------------------------------------------//
+char *preparePackage(const char *payLoad, int length) {
+
+  char checksum[SIZE_CHECKSUM];
+  memcpy(checksum, calcChecksum(payLoad, length), 3 * sizeof(char));
+
+  static char package[SIZE_PACKAGE];
+  snprintf(package, sizeof(package), PACKAGE_FORMAT, START_CHARACTER, DELIMITER_CHARACTER, payLoad, DELIMITER_CHARACTER, checksum, DELIMITER_CHARACTER, END_CHARACTER);
+  return package;
+}
+//--------------------------------------------------------------------------//
+bool compareChecksum(const char *checksumA, const char *checksumB) {
+  bool result = true;
+
+  for (int idx = 0; idx < 3; idx++) {
+    if (checksumA[idx] != checksumB[idx]) {
+      result = false;
+    }
+  }
+  return result;
+}
+//--------------------------------------------------------------------------//
+char *getChecksumFromReceivedPackage(const char *package, int length) {
+  static char checksum[SIZE_CHECKSUM];
+  byte countDelimiterCharacter = 0;
+
+  int  index = 0;
+  bool findOK = false;
+  for (; index < length; index++) {
+    if (package[index] == END_CHARACTER) {
+      findOK = true;
+      break;
+    }
+  }
+
+  if (!findOK) {
+    Serial.println("out");
+    return NULL;
+  }
+
+  index -= 3;
+  for (int idx = 0; idx < SIZE_CHECKSUM - 1; idx++) {
+    checksum[idx] = package[index + idx];
+  }
+  checksum[2] = '\0';
+  return checksum;
+}
+//--------------------------------------------------------------------------//
+bool validatePackage(const char *package, int length) {
+  
+  return compareChecksum(getChecksumFromReceivedPackage(package, length), calcChecksum(package + 2, length - 7)); 
+  // + 2 para saltearme el start_character y el -7 es (caracter de inicio + primer delimitador + 1 delimitador antes del checksum +  2 caracteres del checksum + ultimo delimitador
+  // + caracter de fin.   
+
 }
 
