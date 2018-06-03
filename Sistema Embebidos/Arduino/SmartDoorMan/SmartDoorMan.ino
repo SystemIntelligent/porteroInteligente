@@ -20,7 +20,11 @@
 #define SERIAL_PRINT(x,y)
 #endif
 
-#define ERROR_CODE      (-1)
+#define ERROR_CODE              (-1)
+#define ERROR_BAD_CHECKSUM      (-2)
+#define CLOSE                    0
+#define OPEN                     90
+
 #define PACKAGE_FORMAT "%c%c%s%c%s%c%c" //start character + delimiter character + payLoad + delimiter character + checksum + delimiter character + end character.
 #define SIZE_PAYLOAD     40
 #define SIZE_PACKAGE     SIZE_PAYLOAD + 7
@@ -32,6 +36,7 @@
 #define SS_PIN           10          // Slave Select pin RFID.
 #define BUZZER           2           // pin Buzzer.
 #define PULSADOR         3           // pin Pulsador.
+#define SERVO            5           // servo motor signal.
 //---------------------------------------------------------------------------//
 
 enum buzzerBeep {
@@ -61,8 +66,8 @@ enum commands {
 MFRC522 rfid(SS_PIN, RST_PIN);
 MFRC522::MIFARE_Key key;
 MFRC522::StatusCode status;
-
 LiquidCrystal_I2C lcd(0x3f, 16, 2); // Display Set 2 lineas por 16 caracteres.
+
 
 bool  checkCardInField = false;
 bool  refreshDisplay = false;
@@ -112,9 +117,10 @@ void setup() {
 
   printMsg(MSG_WELCOME);
   SERIAL_PRINT(F("\n> Inicialización finalizada."), "");
+
   attachInterrupt(digitalPinToInterrupt(PULSADOR), ISR_HW, LOW);
   receivedPackage.reserve(200);
-  char msg[] = "06|--datos--";
+  char msg[] = "09|datos proveniente de la raspberry";
 
   char pakage[SIZE_PACKAGE];
   char payLoad[SIZE_PAYLOAD];
@@ -122,21 +128,44 @@ void setup() {
   strcpy(pakage, preparePackage(msg, strlen(msg)));
   SERIAL_PRINT(F("Package: "), pakage);
 
-  /*
-    Serial.print(F("Checksum is Valid ?: "));
-    Serial.println(validatePackage(pakage, strlen(pakage)));
-    strcpy(payLoad, disarmPackage(pakage, strlen(pakage)));
 
-    Serial.print(F("\npayLoad Disarmed: "));
-    Serial.println(payLoad);
-  */
 }
 
 void loop() {
 
   if (packageComplete) {
     packageComplete = false;
-    proccesPackage(receivedPackage, receivedPackage.length());
+    int retCmd = proccesPackage(receivedPackage, receivedPackage.length());
+
+    if (retCmd == ERROR_CODE) {
+      SERIAL_PRINT("> Error unknown command !!", "");
+    }
+    else if (retCmd == ERROR_BAD_CHECKSUM) {
+      SERIAL_PRINT("> Error bad checksum!!", "");
+    }
+    else {
+      switch (retCmd) {
+        case OPEN_DOOR:
+          SERIAL_PRINT(F("> Command Open Door"), "");
+          break;
+
+        case CARD_VALID:
+          SERIAL_PRINT(F("> Command Card Valid"), "");
+          break;
+
+        case CARD_NOT_VALID:
+          SERIAL_PRINT(F("> Command Card not Valid"), "");
+          break;
+
+        case ACK_BUTTON_PRESSED:
+          SERIAL_PRINT(F("> Command ACK button pressed"), "");
+          break;
+
+        case ACK_OPEN_DOOR:
+          SERIAL_PRINT(F("> Command ACK Open Door"), "");
+          break;
+      }
+    }
   }
 
   if (refreshDisplay == true) {
@@ -217,6 +246,7 @@ void ISR_HW() {
 }
 //--------------------------- Timer Handler ---------------------------------//
 void ISR_TIMER(void) {
+
   refreshBuzzer();
 
   countAux0Timer++;
@@ -230,6 +260,7 @@ void ISR_TIMER(void) {
     countAux1Timer = 0;
     refreshDisplay = true;
   }
+
 }
 
 //-------------------------- Evento Serial Handler -------------------------//
@@ -368,10 +399,10 @@ int disarmPayLoad(const char *payLoad, int length, char *data) {
 
   int cmd = atoi(command);
   if (cmd > 0 && cmd < 8) {
-    if (cmd == 6) {  // unico comando proveniente desde la raspberry con datos;
-      memcpy (data, payLoad + 3, (length - 3)*sizeof(char));
-      data[length - 3] = '\0';
-    }
+    //if (cmd == 6) {  // unico comando proveniente desde la raspberry con datos;
+    memcpy (data, payLoad + 3, (length - 3)*sizeof(char));
+    data[length - 3] = '\0';
+    // }
     return cmd;
   }
   return ERROR_CODE; //retCode error;
@@ -399,8 +430,7 @@ int proccesPackage(String package, int length) {
     }
   }
   else {
-    SERIAL_PRINT(F("> Error bad Checksum !!"), "");
-    return ERROR_CODE;
+    return ERROR_BAD_CHECKSUM;
   }
 }
 
