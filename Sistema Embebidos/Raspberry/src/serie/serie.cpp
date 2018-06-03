@@ -15,17 +15,14 @@ int fd = 0;
 char vectorRecibido[256];
 int tamanoRecibido;
 int disponibleRec = TRUE;
-
+char tmp[3];	//YO
 
 static char* checksum(char * p, int length) {
-	int resultado;	//YO
-	char tmp[3];	//YO
-	char * pi = p;		//YO
+	int resultado=0;	//YO
 
 	for (int idx = 0; idx < length; idx++) {
 		resultado = resultado ^ p[idx];
 	}
-
 	if (resultado <= 15) {
 		if (resultado <= 9) {
 			tmp[0] = '0';
@@ -51,7 +48,8 @@ static char* checksum(char * p, int length) {
 		tmp[0] = numHexa[cociente];
 
 	}
-
+//		printf("%c ",tmp[0]);
+//		printf("%c ",tmp[1]);
 	return tmp;
 }
 
@@ -91,7 +89,12 @@ static void *eventoSerial(void *arg) {
 
 }
 
+serie::serie(){
+
+}
+
 int serie::init(CallBack_t funcion) {
+
 	if (fd != 0)
 		return FALSE;
 
@@ -113,11 +116,11 @@ int serie::init(CallBack_t funcion) {
 		fd = 0;
 		return FALSE;
 	}
-	return TRUE;
+	return fd;
 }
 
 int serie::prepare_pack(char * vec, int tam) {
-	if (fd != 0)
+	if (fd == 0)
 		return FALSE;
 	char vectorTransmit[tam + 7];
 //	vectorTransmit[0]=INICIO_DAT;
@@ -135,8 +138,16 @@ int serie::prepare_pack(char * vec, int tam) {
 			vec, SEPARADOR, tmp, SEPARADOR, FIN_DAT);
 //		vectorTransmit[(tam-2)]=tmp[0];//Parte alta checkSum
 //		vectorTransmit[(tam-1)]=tmp[1];//Parte baja checkSum
-	serialPrintf(fd, vectorTransmit);
+//	printf("%c ",*tmp);
+//	printf("%c ",*(tmp+1));
+//	printf("%c \n",(tmp+2));
 
+	serialPrintf(fd, vectorTransmit);
+	int i=0;
+	for(i=0;i<(tam + 7);i++){
+		printf("%x ",vectorTransmit[i]);
+	}
+	puts(" ");
 	return TRUE;
 }
 

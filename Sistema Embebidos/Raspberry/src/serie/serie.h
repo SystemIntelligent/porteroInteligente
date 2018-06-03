@@ -21,6 +21,7 @@ class serie {
 
 public:
 	//tipo_devolución (*nombre)(tipo param1, tipo param2, …)
+	serie();
 	typedef void (*CallBack_t)(void *,int);
 	int init(CallBack_t funcion);
 	int prepare_pack(char * vec, int tam);
