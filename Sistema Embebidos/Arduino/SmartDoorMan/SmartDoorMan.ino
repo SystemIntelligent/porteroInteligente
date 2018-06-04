@@ -1,6 +1,5 @@
 #include <SPI.h>
 #include <MFRC522.h>
-#include <TimerOne.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 
@@ -22,8 +21,8 @@
 
 #define ERROR_CODE              (-1)
 #define ERROR_BAD_CHECKSUM      (-2)
-#define CLOSE                    0
-#define OPEN                     90
+#define CLOSE                    5
+#define OPEN                     65
 
 #define PACKAGE_FORMAT "%c%c%s%c%s%c%c" //start character + delimiter character + payLoad + delimiter character + checksum + delimiter character + end character.
 #define SIZE_PAYLOAD     40
@@ -36,7 +35,7 @@
 #define SS_PIN           10          // Slave Select pin RFID.
 #define BUZZER           2           // pin Buzzer.
 #define PULSADOR         3           // pin Pulsador.
-#define SERVO            5           // servo motor signal.
+#define SERVO_MOTOR      4           // servo motor signal.
 //---------------------------------------------------------------------------//
 
 enum buzzerBeep {
@@ -51,6 +50,8 @@ enum msgDisplay {
   MSG_APPROACH_CARD,
   MSG_CARD_IN_FIELD,
   MSG_DING_DONG,
+  MSG_OPEN_DOOR,
+  MSG_CLOSE_DOOR,
 };
 
 enum commands {
@@ -61,6 +62,7 @@ enum commands {
   VALIDATE_CARD,                 // comando enviado (cuando se requiere validar una tarjeta) desde arduino a raspberry.
   CARD_VALID,                    // comando recibido desde la raspberry.
   CARD_NOT_VALID,                // comando recibido desde la raspberry.
+  CLOSE_DOOR                     // comando recibido desde la raspberry.
 };
 
 MFRC522 rfid(SS_PIN, RST_PIN);
@@ -69,17 +71,16 @@ MFRC522::StatusCode status;
 LiquidCrystal_I2C lcd(0x3f, 16, 2); // Display Set 2 lineas por 16 caracteres.
 
 
-bool  checkCardInField = false;
-bool  refreshDisplay = false;
-int   countAux0Timer = 0;  // contador auxiliar del timer usado para verificacion de tarjeta en campo.
-int   countAux1Timer = 0;   // contador auxiliar del timer usado para refrescar display;
-
-
-int   beepMode = 0;
-int   msgNumber;
-
+bool   checkCardInField = false;
+bool   refreshDisplay = false;
+int    countAux0Timer = 0;    // contador auxiliar del timer usado para verificacion de tarjeta en campo.
+int    countAux1Timer = 0;    // contador auxiliar del timer usado para refrescar display;
+int    beepMode = 0;
+int    msgNumber;
 String receivedPackage = "";
-bool packageComplete = false;
+bool   packageComplete = false;
+int    servoPos = CLOSE;
+bool   closeDoor = false;
 
 //------------------------------- Prototipos de funciones --------------------------------//
 
@@ -98,7 +99,7 @@ int   proccesPackage(String package, int length);
 //----------------------------------------------------------------------------------------//
 
 void setup() {
-
+  pinMode(4, OUTPUT);
   pinMode(BUZZER, OUTPUT);
   pinMode(PULSADOR, INPUT_PULLUP);
   Serial.begin(9600);
@@ -112,26 +113,44 @@ void setup() {
   for (byte idx = 0; idx < 6; idx++) {  // Se setea la key que traen por defecto
     key.keyByte[idx] = 0xFF;            // de las tarjetas midfire.
   }
-  Timer1.initialize(50000);             // se ajusto el timer para tener una interrupcion cada 50 mS.
-  Timer1.attachInterrupt(ISR_TIMER);    // Iterrupt Request Service del Timer.
+
+
+  noInterrupts ();        // deshabilitar todas las interrupciones
+  TCCR1A = 0;
+  TCCR1B = 0;
+  TCNT1 = 65487;          // temporizador de precarga 16MHz / 8 / 2Mhz.
+  TCCR1B = (1 << CS11);   // 8 prescaler.
+  TIMSK1 = (1 << TOIE1);  // habilitar la interrupción del desbordamiento del temporizador.
+  interrupts ();          // activar todas las interrupciones.
+
 
   printMsg(MSG_WELCOME);
   SERIAL_PRINT(F("\n> Inicialización finalizada."), "");
 
-  attachInterrupt(digitalPinToInterrupt(PULSADOR), ISR_HW, LOW);
+  attachInterrupt(digitalPinToInterrupt(PULSADOR), ISR_HW, FALLING);
   receivedPackage.reserve(200);
-  char msg[] = "09|datos proveniente de la raspberry";
-
+  char msg[] = "01|Abrir Puerta";
+  char msg1[] = "08|Cerrar Puerta";
+  
   char pakage[SIZE_PACKAGE];
   char payLoad[SIZE_PAYLOAD];
   SERIAL_PRINT(F("\npayLoad: "), msg);
   strcpy(pakage, preparePackage(msg, strlen(msg)));
   SERIAL_PRINT(F("Package: "), pakage);
 
+  SERIAL_PRINT(F("\npayLoad: "), msg1);
+  strcpy(pakage, preparePackage(msg1, strlen(msg1)));
+  SERIAL_PRINT(F("Package: "), pakage);
 
 }
 
 void loop() {
+
+  if (closeDoor == true) {
+    closeDoor = false;
+    servoPos = CLOSE;
+    printMsg(MSG_CLOSE_DOOR);
+  }
 
   if (packageComplete) {
     packageComplete = false;
@@ -147,8 +166,16 @@ void loop() {
       switch (retCmd) {
         case OPEN_DOOR:
           SERIAL_PRINT(F("> Command Open Door"), "");
+          servoPos = OPEN;
+          printMsg(MSG_OPEN_DOOR);
           break;
 
+        case CLOSE_DOOR:
+          SERIAL_PRINT(F("> Command Close Door"), "");
+          servoPos = CLOSE;
+          printMsg(MSG_CLOSE_DOOR);
+          break;
+        
         case CARD_VALID:
           SERIAL_PRINT(F("> Command Card Valid"), "");
           break;
@@ -211,13 +238,23 @@ void printMsg(int msgNumber) {
     block = true;
     blockCount = 0;
     switch (msgNumber) {
-      case MSG_WELCOME: printDisplay("Portero", "    Inteligente");
+      case MSG_WELCOME:
+        printDisplay("Portero", "    Inteligente");
         break;
-      case MSG_APPROACH_CARD: printDisplay("Acerque su      ", "     Tarjeta ...");
+      case MSG_APPROACH_CARD:
+        printDisplay("Acerque su     ", "    Tarjeta ... ");
         break;
-      case MSG_CARD_IN_FIELD: printDisplay("Tarjeta         ", "     en campo!! ");
+      case MSG_CARD_IN_FIELD:
+        printDisplay("Tarjeta sobre  ", "      el lector ");
         break;
-      case MSG_DING_DONG: printDisplay("  Ding         ", "     Dong ...   ");
+      case MSG_DING_DONG:
+        printDisplay("  Ding         ", "     Dong ...   ");
+        break;
+      case MSG_OPEN_DOOR:
+        printDisplay("Abriendo       ", "    Puerta ...  ");
+        break;
+      case MSG_CLOSE_DOOR:
+        printDisplay("Cerrando       ", "    Puerta ...  ");
         break;
 
     }
@@ -245,24 +282,44 @@ void ISR_HW() {
   refreshDisplay = true;
 }
 //--------------------------- Timer Handler ---------------------------------//
-void ISR_TIMER(void) {
+ISR (TIMER1_OVF_vect) {
 
-  refreshBuzzer();
+  static int countRefresh = 0;
+  static unsigned long countCloseDoor = 0;
 
-  countAux0Timer++;
-  if (countAux0Timer == 7) {
-    countAux0Timer = 0;
-    checkCardInField = true;
+  countRefresh++;
+  countCloseDoor++;
+
+  servoRefresh(servoPos);
+  /*
+    if (servoPos == OPEN) {            // Activo retardo de cierre de cerradura.
+      countCloseDoor++;
+      if (countCloseDoor >= 500000) {
+        countCloseDoor = 0;
+        closeDoor = true;
+      }
+    }
+  */
+
+  if (countRefresh >= 2083) {         // Tengo una interrupción de timer cada (1 / (16Mhz / 8)) * 48 = 24 uS ---> 24 uS * 2083 = 50 mS.
+    countRefresh = 0;
+    refreshBuzzer();
+    countAux0Timer++;
+    if (countAux0Timer == 15) {
+      countAux0Timer = 0;
+      checkCardInField = true;
+    }
+
+    countAux1Timer++;
+    if (countAux1Timer == 5) {
+      countAux1Timer = 0;
+      refreshDisplay = true;
+    }
   }
 
-  countAux1Timer++;
-  if (countAux1Timer == 5) {
-    countAux1Timer = 0;
-    refreshDisplay = true;
-  }
+  TCNT1 = 65487;                   // (1 / (16Mhz / 8)) * 48 = 24 us * 127 = 3mS ---> período de la señal PWM requerida por el servo motor.
 
 }
-
 //-------------------------- Evento Serial Handler -------------------------//
 void serialEvent() {
 
@@ -398,7 +455,7 @@ int disarmPayLoad(const char *payLoad, int length, char *data) {
   command[2] = '\0';
 
   int cmd = atoi(command);
-  if (cmd > 0 && cmd < 8) {
+  if (cmd > 0 && cmd < 9) {
     //if (cmd == 6) {  // unico comando proveniente desde la raspberry con datos;
     memcpy (data, payLoad + 3, (length - 3)*sizeof(char));
     data[length - 3] = '\0';
@@ -433,5 +490,37 @@ int proccesPackage(String package, int length) {
     return ERROR_BAD_CHECKSUM;
   }
 }
+//--------------------------------------------------------------------------//
+void servoRefresh(int servoPos) {
+  static int servoLast = 99;
+  static int countServo = 0;
+  countServo++;
 
+  static bool block = false;
+  static unsigned long blockCount = 0;
+
+
+  if (servoLast != servoPos) {
+    blockCount++;
+    if (blockCount > 50000) {
+      servoLast = servoPos;
+      blockCount = 0;
+      digitalWrite (SERVO_MOTOR, LOW);
+    }
+  }
+
+  if (servoLast != servoPos) {
+    if (countServo >= 128) {
+      countServo = 0;
+    }
+
+    else if (countServo <= servoPos) {
+      digitalWrite (SERVO_MOTOR, HIGH);
+    }
+    else
+    {
+      digitalWrite (SERVO_MOTOR, LOW);
+    }
+  }
+}
 
