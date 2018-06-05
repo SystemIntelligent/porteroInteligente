@@ -5,19 +5,12 @@
  *      Author: julian
  */
 #include "serie.h"
-//#include <errno.h>
-#include <stdio.h>
-#include <common/common.h>
-
-#include <wiringSerial.h>
-
 int fd = 0;
+char tmp[3];	//YO
 char vectorRecibido[256];
 int tamanoRecibido;
-int disponibleRec = TRUE;
-char tmp[3];	//YO
 
-static char* checksum(char * p, int length) {
+char* serie::checksum(const char * p, int length) {
 	int resultado=0;	//YO
 
 	for (int idx = 0; idx < length; idx++) {
@@ -53,11 +46,11 @@ static char* checksum(char * p, int length) {
 	return tmp;
 }
 
-static void *eventoSerial(void *arg) {
+void* serie::eventoSerial(void *arg) {
 	serie::CallBack_t pfuncion = (serie::CallBack_t) arg;
 	while (true) {
 		int cant = serialDataAvail(fd);
-		if (cant != 0 || disponibleRec == TRUE) {
+		if (cant > 0 || disponibleRec == true) {
 			tamanoRecibido = cant;
 			int flagInit = FALSE, flagFin = FALSE;
 //			for (int i = 0; i < cant; i++) {
@@ -72,6 +65,7 @@ static void *eventoSerial(void *arg) {
 						if (aux == FIN_DAT) {
 							//Terminó
 							flagInit = FALSE;
+							disponibleRec = false;
 							if (pfuncion != NULL)
 								pfuncion(vectorRecibido, i);
 
@@ -90,7 +84,6 @@ static void *eventoSerial(void *arg) {
 }
 
 serie::serie(){
-
 }
 
 int serie::init(CallBack_t funcion) {
@@ -123,31 +116,19 @@ int serie::prepare_pack(char * vec, int tam) {
 	if (fd == 0)
 		return FALSE;
 	char vectorTransmit[tam + 7];
-//	vectorTransmit[0]=INICIO_DAT;
-//	vectorTransmit[1]=SEPARADOR;
-//
-//	vectorTransmit[(tam-3)]=SEPARADOR;
-//
-//	vectorTransmit[tam]=SEPARADOR;
-//	vectorTransmit[(tam+1)]=FIN_DAT;
 
 	//hace CHecksum
 	char * tmp = checksum(vec, tam);
 	//ojo '/0'
 	sprintf((char*) vectorTransmit, "%c%c%s%c%s%c%c", INICIO_DAT, SEPARADOR,
 			vec, SEPARADOR, tmp, SEPARADOR, FIN_DAT);
-//		vectorTransmit[(tam-2)]=tmp[0];//Parte alta checkSum
-//		vectorTransmit[(tam-1)]=tmp[1];//Parte baja checkSum
-//	printf("%c ",*tmp);
-//	printf("%c ",*(tmp+1));
-//	printf("%c \n",(tmp+2));
 
 	serialPrintf(fd, vectorTransmit);
-	int i=0;
-	for(i=0;i<(tam + 7);i++){
-		printf("%x ",vectorTransmit[i]);
-	}
-	puts(" ");
+// visualización de lo enviado.
+//	int i=0;
+//	for(i=0;i<(tam + 7);i++){
+//		printf("%x ",vectorTransmit[i]);
+//	}
+//	puts(" ");
 	return TRUE;
 }
-
