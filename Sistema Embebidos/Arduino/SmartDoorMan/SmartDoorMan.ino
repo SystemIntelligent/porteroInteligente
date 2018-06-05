@@ -203,7 +203,7 @@ void loop() {
   if (checkCardInField == true) {
     checkCardInField = false;
     if (rfid.PICC_IsNewCardPresent()) {
-      SERIAL_PRINT(F("\n> Tarjeta en Campo"), "");
+      SERIAL_PRINT(F("\n> Tarjeta sobre el Lector"), "");
       msgNumber = MSG_CARD_IN_FIELD;
       beepMode = ONE_BEEP_SHORT;
       if ( rfid.PICC_ReadCardSerial()) {
