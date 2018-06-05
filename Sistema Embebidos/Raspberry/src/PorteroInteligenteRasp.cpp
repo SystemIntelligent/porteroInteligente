@@ -8,26 +8,23 @@
 
 #include <iostream>
 #include <serie/serie.h>
+#include <comunicacion/Comunicacion.h>
 #include <common/common.h>
-
-#include <wiringSerial.h>
+extern bool disponibleRec;
+extern char vectorRecibido[];
 using namespace std;
 void procesarDato(void* vec, int cant);
+
+Comunicacion myserie;
 int main() {
-	serie myserie;
-	int fd=myserie.init(procesarDato);
-	char vec[]={'H','o','l','a','J','u','u'};
+	char comand='1';
+	char datos[1]={0xFF};
+	myserie.enviarDatos(comand,1,datos);
 
-	myserie.prepare_pack(vec,7);
-while (true){
-	cout << "!!!Hello soa" << fd<<" "<<endl; // prints !!!Hello World!!!
-	usleep(4000000);
-
-}
-	cout << "!!!Hello soa" << fd<<" "<<endl; // prints !!!Hello World!!!
-	return 0;
 }
 
 void procesarDato(void* vec, int cant){
+	disponibleRec=TRUE;
+
 	cout << "Hello SOAAA!!!" << endl;
 }
