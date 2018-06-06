@@ -2,14 +2,36 @@
 #include <MFRC522.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
+#include <SoftwareSerial.h>
+
+// ---------------------- Definicion de Pines -------------------------------//
+#define RST_PIN          9           // Pin reset RFID.
+#define SS_PIN           10          // Slave Select pin RFID.
+#define BUZZER           2           // pin Buzzer.
+#define PULSADOR         3           // pin Pulsador.
+#define SERVO_MOTOR      4           // servo motor signal.
+//---------------------------------------------------------------------------//
+
+MFRC522 rfid(SS_PIN, RST_PIN);
+MFRC522::MIFARE_Key key;
+MFRC522::StatusCode status;
+LiquidCrystal_I2C lcd(0x3f, 16, 2); // Display Set 2 lineas por 16 caracteres.
+SoftwareSerial SoftSerial(7, 8); // RX, TX
+
 
 #define DEBUG
 
 #ifdef  DEBUG
+/*
 #define DELIMITER_CHARACTER '|'
 #define START_CHARACTER 'S'
 #define END_CHARACTER 'F'
-#define SERIAL_PRINT(x,y)        Serial.print(x);Serial.println(y);
+*/
+#define DELIMITER_CHARACTER (int8_t)0xAE
+#define START_CHARACTER (int8_t)0x91
+#define END_CHARACTER (int8_t)0x92
+
+#define SERIAL_PRINT(x,y)        SoftSerial.print(x);SoftSerial.println(y);
 #endif
 
 #ifndef DEBUG
@@ -28,15 +50,6 @@
 #define SIZE_PAYLOAD     40
 #define SIZE_PACKAGE     SIZE_PAYLOAD + 7
 #define SIZE_CHECKSUM    3
-
-
-// ---------------------- Definicion de Pines -------------------------------//
-#define RST_PIN          9           // Pin reset RFID.
-#define SS_PIN           10          // Slave Select pin RFID.
-#define BUZZER           2           // pin Buzzer.
-#define PULSADOR         3           // pin Pulsador.
-#define SERVO_MOTOR      4           // servo motor signal.
-//---------------------------------------------------------------------------//
 
 enum buzzerBeep {
   ONE_BEEP_SHORT = 0b01000000,
@@ -64,11 +77,6 @@ enum commands {
   CARD_NOT_VALID,                // comando recibido desde la raspberry.
   CLOSE_DOOR                     // comando recibido desde la raspberry.
 };
-
-MFRC522 rfid(SS_PIN, RST_PIN);
-MFRC522::MIFARE_Key key;
-MFRC522::StatusCode status;
-LiquidCrystal_I2C lcd(0x3f, 16, 2); // Display Set 2 lineas por 16 caracteres.
 
 
 bool   checkCardInField = false;
@@ -102,6 +110,7 @@ void setup() {
   pinMode(4, OUTPUT);
   pinMode(BUZZER, OUTPUT);
   pinMode(PULSADOR, INPUT_PULLUP);
+  SoftSerial.begin(9600);
   Serial.begin(9600);
 
   lcd.init();                           // inicializacion del display
@@ -207,7 +216,15 @@ void loop() {
       msgNumber = MSG_CARD_IN_FIELD;
       beepMode = ONE_BEEP_SHORT;
       if ( rfid.PICC_ReadCardSerial()) {
-        rfid.PICC_DumpDetailsToSerial(&(rfid.uid));
+        //rfid.PICC_DumpDetailsToSerial(&(rfid.uid));
+        char cmd[] = "05";
+        char payLoad[10];
+        char pakage[50];
+        snprintf(payLoad,sizeof(payLoad),"%s%c%s",cmd,(char)DELIMITER_CHARACTER,"04");
+        SERIAL_PRINT(F("payLoad: "),pakage);
+        strcpy(pakage, preparePackage(payLoad, strlen(payLoad)));
+        SERIAL_PRINT(F("package: "),pakage);
+        Serial.println(pakage); 
       }
     }
     else {
