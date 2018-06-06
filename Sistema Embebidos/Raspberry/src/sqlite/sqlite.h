@@ -9,9 +9,7 @@
 #define SQLITE_SQLITE_H_
 #include <common/common.h>
 
-
 namespace std {
-
 
 class sqlite {
 
@@ -19,7 +17,8 @@ private:
 	static char queryAnswer[500];
 	static bool resultCallBack;
 
-	static int queryResult(void *nothing, int argc, char **argv, char **colName);
+	static int queryResult(void *nothing, int argc, char **argv,
+			char **colName);
 	sqlite3 *db;
 	int response;
 	char *error;
@@ -30,9 +29,10 @@ public:
 	sqlite(const char *dataBaseName);
 	int init(void);
 	int insert(const char *tableName, const char *data);
-	int deleteItem(const char *tableName, const char *columName, const char *data);
+	int deleteItem(const char *tableName, const char *columName,const char *data);
 	int deletAllItems(const char *tableName);
 	char* selectFirstItem(const char *columName, const char *tableName);
+	char* selectItem(const char *column,const char *whereCondition,const char *columnToShow, const char *tableName);
 	int createDataBase(const char *nameDB, const char *dbColummsAndFormats);
 	char* countItems(const char *tableName);
 	void close(void);

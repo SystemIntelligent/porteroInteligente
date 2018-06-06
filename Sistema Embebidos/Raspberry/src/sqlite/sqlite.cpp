@@ -147,6 +147,37 @@ char* sqlite::selectFirstItem(const char *columName, const char *tableName) {
         }
 
 }
+
+char* sqlite::selectItem(const char *column,const char *whereCondition,const char *columnToShow, const char *tableName){
+	if (openOK == false) {
+			return NULL;
+		}
+
+		#define QUERY_SELECT_ITEM_TEMPLATE "SELECT %s FROM %s WHERE %s = '%s'"
+		char query[500];
+			sprintf(query, QUERY_SELECT_ITEM_TEMPLATE, columnToShow, tableName,column,whereCondition);
+			PRINT_DEBUG_SQLITE("sqlite(select item): ", query);
+			resultCallBack = false;
+			response = sqlite3_exec(db, query, queryResult, 0, &error);
+			if (response != SQLITE_OK) {
+				PRINT_DEBUG_SQLITE("sqlite: ", "Error 'select first item'");
+				sqlite3_free(error);
+				sqlite3_close(db);
+				return NULL;
+			}
+	        unsigned long tInit = millis();
+	        while((millis()-tInit) < 1000 && resultCallBack == false);
+	        if (resultCallBack == true){
+	        	PRINT_DEBUG_SQLITE("sqlite(result query-->select): ", "ok");
+	        	return queryAnswer;
+	        }
+	        else{
+	        	PRINT_DEBUG_SQLITE("sqlite(result query-->select): ", "error");
+	            return NULL;
+	        }
+
+}
+
 char* sqlite::countItems(const char *tableName) {
 	if (openOK == false) {
 		return NULL;
