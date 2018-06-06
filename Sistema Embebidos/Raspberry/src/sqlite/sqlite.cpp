@@ -11,6 +11,10 @@
 
 namespace std {
 
+char sqlite::queryAnswer[500];
+bool sqlite::resultCallBack;
+
+
 int sqlite::queryResult(void *nothing, int argc, char **argv,
 		char **colName) {
 
@@ -38,6 +42,7 @@ int sqlite::init(void) {
 		sqlite3_close(db);
 		return 1;
 	}
+	resultCallBack = false;
 	openOK = true;
 	return 0;
 }

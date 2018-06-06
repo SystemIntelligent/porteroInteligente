@@ -12,12 +12,12 @@
 
 namespace std {
 
-static char queryAnswer[500];
-static bool resultCallBack = false;
 
 class sqlite {
 
 private:
+	static char queryAnswer[500];
+	static bool resultCallBack;
 
 	static int queryResult(void *nothing, int argc, char **argv, char **colName);
 	sqlite3 *db;
