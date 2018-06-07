@@ -47,16 +47,20 @@ char* serie::checksum(const char * p, int length) {
 }
 
 void* serie::eventoSerial(void *arg) {
-	serie::CallBack_t pfuncion = (serie::CallBack_t) arg;
+	argThread *argTh = (argThread*) arg;
+		int fileDescriptor = argTh->fd;
+		CallBack_t pfuncion = argTh->pfuncion;
 	while (true) {
 		int cant = serialDataAvail(fd);
-		if (cant > 0 || disponibleRec == true) {
+
+		if (cant > 0 ) {
+//			cout<<"Recibio: "<< cant<<endl;
 			tamanoRecibido = cant;
 			int flagInit = FALSE, flagFin = FALSE;
-//			for (int i = 0; i < cant; i++) {
 			int i;
-			while(cant!=0){
+			while(cant!=0 || disponibleRec==true){
 				char aux = serialGetchar(fd);
+//				pthread_mutex_lock(&mutexSerie);
 				if (aux == INICIO_DAT && flagFin == FALSE) {
 					flagInit = TRUE;
 					i=0;
@@ -65,13 +69,14 @@ void* serie::eventoSerial(void *arg) {
 						if (aux == FIN_DAT) {
 							//Terminó
 							flagInit = FALSE;
-							disponibleRec = false;
+							puts("");
+							disponibleRec=false;
 							if (pfuncion != NULL)
 								pfuncion(vectorRecibido, i);
 
 						} else {
 							vectorRecibido[i] = aux;
-							printf(" -> %3d", vectorRecibido[i]);
+							printf(" - %02x", vectorRecibido[i]);
 							i++;
 						}
 					}
@@ -79,6 +84,8 @@ void* serie::eventoSerial(void *arg) {
 				cant--;
 			}
 		}
+
+		usleep(5000);
 	}
 
 }
@@ -86,12 +93,12 @@ void* serie::eventoSerial(void *arg) {
 serie::serie(){
 }
 
-int serie::init(CallBack_t funcion) {
-
+int serie::init(CallBack_t funcion, int velocidad) {
+	pthread_mutex_init(&mutexSerie, NULL);
 	if (fd != 0)
 		return FALSE;
 
-	if ((fd = serialOpen("/dev/ttyAMA0", 115200)) < 0) {
+	if ((fd = serialOpen("/dev/ttyAMA0", velocidad)) < 0) {
 		fprintf(stderr, "No pudo abrirse el puerto serial: %s\n",
 				strerror(errno));
 		return FALSE;
@@ -102,8 +109,10 @@ int serie::init(CallBack_t funcion) {
 			return FALSE;
 		}
 	}
+	argumentosTh.fd=fd;
+	argumentosTh.pfuncion=funcion;
 	pthread_t threadId;
-	int err = pthread_create(&threadId, NULL, eventoSerial, &funcion);//eventoSerial es donde se fija si hay un mensaje.
+	int err = pthread_create(&threadId, NULL, eventoSerial, &argumentosTh);//eventoSerial es donde se fija si hay un mensaje.
 	if (err != 0) {
 		printf("Error al crear Hilo.");
 		fd = 0;
@@ -124,6 +133,7 @@ int serie::prepare_pack(char * vec, int tam) {
 			vec, SEPARADOR, tmp, SEPARADOR, FIN_DAT);
 
 	serialPrintf(fd, vectorTransmit);
+	cout<<"ENVIO"<<endl;
 // visualización de lo enviado.
 //	int i=0;
 //	for(i=0;i<(tam + 7);i++){

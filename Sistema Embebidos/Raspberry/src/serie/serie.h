@@ -9,7 +9,8 @@
 #include <wiringSerial.h>
 #ifndef SERIE_SERIE_H_
 #define SERIE_SERIE_H_
-static bool disponibleRec=true;
+static volatile bool disponibleRec=true;
+static pthread_mutex_t mutexSerie;
 class serie {
 
 public:
@@ -22,8 +23,13 @@ public:
 	//tipo_devolución (*nombre)(tipo param1, tipo param2, …)
 	serie();
 	typedef void (*CallBack_t)(void *,int);
+	typedef struct {
+		CallBack_t pfuncion;
+		int fd;
+	}argThread;
+	argThread argumentosTh;
 	static char* checksum(const char * p, int length);
-	int init(CallBack_t funcion);
+	int init(CallBack_t funcion, int velocidad);
 	int prepare_pack(char * vec, int tam);
 protected:
 	bool  validatePackage(const char *package, int length);

@@ -74,7 +74,7 @@ bool Comunicacion::validatePackage(const char *package, int length) {
 
 
 Comunicacion::Comunicacion():serie() {
-	serie::init(procesarEntrada);
+	serie::init(procesarEntrada,VELOCIDAD);
 
 }
 
@@ -82,7 +82,6 @@ void Comunicacion::procesarEntrada(void* vec,int tam){
 	char* vector=(char*) vec;
 	 char  payLoad[256];
 	char comando;
-
 	//valido si el checkSum es correcto
 	if(Comunicacion::validatePackage(vector,tam)==true){
 		// El checksum es valido
@@ -91,6 +90,7 @@ void Comunicacion::procesarEntrada(void* vec,int tam){
 		cout<<"> PayLoad Disarmed: "<<endl;
 		char data[50];
 		int command = disarmPayLoad(payLoad, strlen(payLoad), data);
+
 		if (command != -1) {
 			cout<<"> Command: "<<command<<endl;
 			cout<<"> Data: "<< data<<endl;
@@ -106,9 +106,8 @@ void Comunicacion::procesarEntrada(void* vec,int tam){
 		  cout << "Comando invalido"<<endl;
 		}
 	}else cout << "CheckSum invalido"<<endl;
-
 	disponibleRec=true;
-
+//	pthread_mutex_unlock(&mutexSerie);
 }
 
 void Comunicacion::enviarDatos(char comando,int tam,char *dato){
