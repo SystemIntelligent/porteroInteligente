@@ -7,8 +7,6 @@
 
 #include <comunicacion/Comunicacion.h>
 
-
-
 char * Comunicacion::getChecksumFromReceivedPackage(const char *package, int length) {
   static char checksum[SIZE_CHECKSUM];
   int index = 3;
@@ -56,7 +54,7 @@ int Comunicacion::disarmPayLoad(const char *payLoad, int length, char *data) {
  * Mi paquete no tiene los caracteres de inicio, y fin.
  */
 char *Comunicacion::disarmPackage(const char *package, int length) {
-  static char payLoad[256];
+  static char payLoad[TAMANO_MAXIMO];
   memcpy(payLoad, package + 1, (length - 5 )*sizeof(char)); // +1 primer delimitador(1); -5 para no copiar
   // primer delimitador(1), delimitador antes del checksum(1) el checksum(2) el limitador despues del checksum(1) y el caracter de fin de paquete(1).
   payLoad[length - 5] = '\0';
@@ -75,13 +73,13 @@ bool Comunicacion::validatePackage(const char *package, int length) {
 
 Comunicacion::Comunicacion():serie() {
 	serie::init(procesarEntrada,VELOCIDAD);
-
 }
 
 void Comunicacion::procesarEntrada(void* vec,int tam){
 	char* vector=(char*) vec;
-	 char  payLoad[256];
+	char  payLoad[TAMANO_MAXIMO];
 	char comando;
+//	cout<<"RECIBOooo:"<<endl;
 	//valido si el checkSum es correcto
 	if(Comunicacion::validatePackage(vector,tam)==true){
 		// El checksum es valido
@@ -90,7 +88,6 @@ void Comunicacion::procesarEntrada(void* vec,int tam){
 		cout<<"> PayLoad Disarmed: "<<endl;
 		char data[50];
 		int command = disarmPayLoad(payLoad, strlen(payLoad), data);
-
 		if (command != -1) {
 			cout<<"> Command: "<<command<<endl;
 			cout<<"> Data: "<< data<<endl;
@@ -106,12 +103,10 @@ void Comunicacion::procesarEntrada(void* vec,int tam){
 		  cout << "Comando invalido"<<endl;
 		}
 	}else cout << "CheckSum invalido"<<endl;
-	disponibleRec=true;
-//	pthread_mutex_unlock(&mutexSerie);
 }
 
 void Comunicacion::enviarDatos(char comando,int tam,char *dato){
-	static char vec[256];
+	static char vec[TAMANO_MAXIMO];
 	sprintf((char*) vec, "%c%c%s",comando, SEPARADOR, dato);
 
 	serie::prepare_pack(vec,sizeof(vec));

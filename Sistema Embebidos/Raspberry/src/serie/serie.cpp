@@ -7,7 +7,7 @@
 #include "serie.h"
 int fd = 0;
 char tmp[3];	//YO
-char vectorRecibido[256];
+char vectorRecibido[TAMANO_MAXIMO];
 int tamanoRecibido;
 
 char* serie::checksum(const char * p, int length) {
@@ -48,40 +48,38 @@ char* serie::checksum(const char * p, int length) {
 
 void* serie::eventoSerial(void *arg) {
 	argThread *argTh = (argThread*) arg;
-		int fileDescriptor = argTh->fd;
-		CallBack_t pfuncion = argTh->pfuncion;
+//		volatile int fileDescriptor = argTh->fd;
+		volatile CallBack_t pfuncion = argTh->pfuncion;
 	while (true) {
 		int cant = serialDataAvail(fd);
 
 		if (cant > 0 ) {
-//			cout<<"Recibio: "<< cant<<endl;
 			tamanoRecibido = cant;
-			int flagInit = FALSE, flagFin = FALSE;
+			int flagInit = FALSE;
 			int i;
-			while(cant!=0 || disponibleRec==true){
-				char aux = serialGetchar(fd);
-//				pthread_mutex_lock(&mutexSerie);
-				if (aux == INICIO_DAT && flagFin == FALSE) {
-					flagInit = TRUE;
-					i=0;
-				} else {
-					if (flagInit == TRUE) {
-						if (aux == FIN_DAT) {
-							//Terminó
-							flagInit = FALSE;
-							puts("");
-							disponibleRec=false;
-							if (pfuncion != NULL)
-								pfuncion(vectorRecibido, i);
-
-						} else {
-							vectorRecibido[i] = aux;
-							printf(" - %02x", vectorRecibido[i]);
-							i++;
+			while(cant>0){
+					char aux = serialGetchar(fd);
+					if (aux == INICIO_DAT) {
+						flagInit = TRUE;
+						printf("Recibio: ");
+						i=0;
+					} else {
+						if (flagInit == TRUE) {
+							if (aux == FIN_DAT) {
+								//Terminó
+								flagInit = FALSE;
+								puts("");
+								if (pfuncion != NULL){
+									pfuncion(vectorRecibido, i);
+								}
+							} else {
+								vectorRecibido[i] = aux;
+								printf(" %02x", vectorRecibido[i]);
+								i++;
+							}
 						}
 					}
-				}
-				cant--;
+					cant--;
 			}
 		}
 
@@ -133,7 +131,7 @@ int serie::prepare_pack(char * vec, int tam) {
 			vec, SEPARADOR, tmp, SEPARADOR, FIN_DAT);
 
 	serialPrintf(fd, vectorTransmit);
-	cout<<"ENVIO"<<endl;
+//	cout<<"Envioo"<<endl;
 // visualización de lo enviado.
 //	int i=0;
 //	for(i=0;i<(tam + 7);i++){

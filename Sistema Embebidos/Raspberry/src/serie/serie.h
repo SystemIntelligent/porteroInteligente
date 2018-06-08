@@ -19,6 +19,7 @@ public:
 #define SEPARADOR	0xAE
 #define SIZE_CHECKSUM    3
 #define ERROR_CODE      (-1)
+#define TAMANO_MAXIMO 1024
 
 	//tipo_devolución (*nombre)(tipo param1, tipo param2, …)
 	serie();

@@ -19,7 +19,7 @@ enum commands {
 	};
 class Comunicacion : public serie {
 protected:
-#define VELOCIDAD 115200
+#define VELOCIDAD 9600
 	static int disarmPayLoad(const char *payLoad, int length, char *data);
 	static char *disarmPackage(const char *package, int length);
 	static char* getChecksumFromReceivedPackage(const char *package, int length);
