@@ -24,7 +24,7 @@ using namespace std;
 
 #define TRUE	1
 #define FALSE	0
-
+typedef void (*CallBackMain_t)(int,int,void *);
 #endif /* SRC_COMMON_COMMON_H_ */
 
 

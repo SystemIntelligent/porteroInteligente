@@ -10,7 +10,7 @@
 #ifndef SERIE_SERIE_H_
 #define SERIE_SERIE_H_
 static volatile bool disponibleRec=true;
-static pthread_mutex_t mutexSerie;
+//static pthread_mutex_t mutexSerie;
 class serie {
 
 public:
@@ -19,7 +19,7 @@ public:
 #define SEPARADOR	0xAE
 #define SIZE_CHECKSUM    3
 #define ERROR_CODE      (-1)
-#define TAMANO_MAXIMO 1024
+#define TAMANO_MAXIMO 256
 
 	//tipo_devolución (*nombre)(tipo param1, tipo param2, …)
 	serie();
