@@ -6,7 +6,7 @@
  */
 
 #include <comunicacion/Comunicacion.h>
-
+argument Comunicacion::argFuncionn;
 char * Comunicacion::getChecksumFromReceivedPackage(const char *package, int length) {
   static char checksum[SIZE_CHECKSUM];
   int index = 3;
@@ -40,10 +40,10 @@ int Comunicacion::disarmPayLoad(const char *payLoad, int length, char *data) {
 
   int cmd = atoi(command);
   if (cmd > 0 && cmd < 9) {
-    //if (cmd == 6) {  // unico comando proveniente desde la raspberry con datos;
+
     memcpy (data, payLoad + 3, (length - 3)*sizeof(char));
     data[length - 3] = '\0';
-    // }
+
     return cmd;
   }
   return ERROR_CODE; //retCode error;
@@ -68,7 +68,9 @@ bool Comunicacion::validatePackage(const char *package, int length) {
 
 }
 
-
+void Comunicacion::init(CallBackMain_t funcion) {
+	argFuncionn.pfuncion=funcion;
+}
 
 
 Comunicacion::Comunicacion():serie() {
@@ -78,26 +80,18 @@ Comunicacion::Comunicacion():serie() {
 void Comunicacion::procesarEntrada(void* vec,int tam){
 	char* vector=(char*) vec;
 	char  payLoad[TAMANO_MAXIMO];
-	char comando;
-//	cout<<"RECIBOooo:"<<endl;
 	//valido si el checkSum es correcto
 	if(Comunicacion::validatePackage(vector,tam)==true){
 		// El checksum es valido
 		cout<<"> Checksum valido!!"<<endl;
 		strcpy(payLoad, disarmPackage(vector, tam));
 		cout<<"> PayLoad Disarmed: "<<endl;
-		char data[50];
-		int command = disarmPayLoad(payLoad, strlen(payLoad), data);
-		if (command != -1) {
-			cout<<"> Command: "<<command<<endl;
-			cout<<"> Data: "<< data<<endl;
-			if(comando==ACK_OPEN_DOOR){
-				//HOLA
-			}else if (comando==BUTTON_PRESSED) {
-				//RELLENO
-			}else if (comando==VALIDATE_CARD) {
-				//RELLENAR
-			}
+		int commandoRec = disarmPayLoad(payLoad, strlen(payLoad), vectorRec);
+		if (commandoRec != -1) {
+//			llamo al callBack del Main
+			volatile CallBackMain_t pfuncionMain = argFuncionn.pfuncion;
+			if(pfuncionMain!=NULL)
+				pfuncionMain(commandoRec,strlen(payLoad),vectorRec);
 		}
 		else {
 		  cout << "Comando invalido"<<endl;

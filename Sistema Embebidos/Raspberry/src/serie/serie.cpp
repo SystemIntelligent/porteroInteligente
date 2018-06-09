@@ -92,7 +92,6 @@ serie::serie(){
 }
 
 int serie::init(CallBack_t funcion, int velocidad) {
-	pthread_mutex_init(&mutexSerie, NULL);
 	if (fd != 0)
 		return FALSE;
 
