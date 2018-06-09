@@ -561,7 +561,7 @@ char* readCard() {
     SERIAL_PRINT(F("Reading failed: "), rfid.GetStatusCodeName(status));
     return ERROR_READ_CARD;
   }
-/*
+/*     
   //print data card.
   SERIAL_PRINT_("Data Card: ", "");
   for (uint8_t i = 2; i < 16; i++)
