@@ -22,16 +22,18 @@ SoftwareSerial SoftSerial(7, 8); // RX, TX
 #define DEBUG
 
 #ifdef  DEBUG
-/*
+
 #define DELIMITER_CHARACTER '|'
 #define START_CHARACTER 'S'
 #define END_CHARACTER 'F'
-*/
-#define DELIMITER_CHARACTER (int8_t)0xAE
-#define START_CHARACTER (int8_t)0x91
-#define END_CHARACTER (int8_t)0x92
 
+/*
+  #define DELIMITER_CHARACTER (int8_t)0xAE
+  #define START_CHARACTER (int8_t)0x91
+  #define END_CHARACTER (int8_t)0x92
+*/
 #define SERIAL_PRINT(x,y)        SoftSerial.print(x);SoftSerial.println(y);
+#define SERIAL_PRINT_(x,y)       SoftSerial.print(x);SoftSerial.print(y);
 #endif
 
 #ifndef DEBUG
@@ -43,6 +45,7 @@ SoftwareSerial SoftSerial(7, 8); // RX, TX
 
 #define ERROR_CODE              (-1)
 #define ERROR_BAD_CHECKSUM      (-2)
+#define ERROR_READ_CARD         (-3)
 #define CLOSE                    5
 #define OPEN                     65
 
@@ -140,7 +143,7 @@ void setup() {
   receivedPackage.reserve(200);
   char msg[] = "01|Abrir Puerta";
   char msg1[] = "08|Cerrar Puerta";
-  
+
   char pakage[SIZE_PACKAGE];
   char payLoad[SIZE_PAYLOAD];
   SERIAL_PRINT(F("\npayLoad: "), msg);
@@ -184,7 +187,7 @@ void loop() {
           servoPos = CLOSE;
           printMsg(MSG_CLOSE_DOOR);
           break;
-        
+
         case CARD_VALID:
           SERIAL_PRINT(F("> Command Card Valid"), "");
           break;
@@ -215,16 +218,17 @@ void loop() {
       SERIAL_PRINT(F("\n> Tarjeta sobre el Lector"), "");
       msgNumber = MSG_CARD_IN_FIELD;
       beepMode = ONE_BEEP_SHORT;
-      if ( rfid.PICC_ReadCardSerial()) {
+      if (rfid.PICC_ReadCardSerial()) {
         //rfid.PICC_DumpDetailsToSerial(&(rfid.uid));
         char cmd[] = "05";
         char payLoad[10];
         char pakage[50];
-        snprintf(payLoad,sizeof(payLoad),"%s%c%s",cmd,(char)DELIMITER_CHARACTER,"04");
-        SERIAL_PRINT(F("payLoad: "),pakage);
+        snprintf(payLoad, sizeof(payLoad), "%s%c%s", cmd, (char)DELIMITER_CHARACTER, "04");
+        SERIAL_PRINT(F("payLoad: "), payLoad);
         strcpy(pakage, preparePackage(payLoad, strlen(payLoad)));
-        SERIAL_PRINT(F("package: "),pakage);
-        Serial.println(pakage); 
+        SERIAL_PRINT(F("package: "), pakage);
+        Serial.print(pakage);
+        SERIAL_PRINT("> Data Card: ",readCard());
       }
     }
     else {
@@ -322,7 +326,7 @@ ISR (TIMER1_OVF_vect) {
     countRefresh = 0;
     refreshBuzzer();
     countAux0Timer++;
-    if (countAux0Timer == 15) {
+    if (countAux0Timer == 7) {
       countAux0Timer = 0;
       checkCardInField = true;
     }
@@ -397,7 +401,7 @@ char* calcChecksum(const char *data, int length) {
     checksum[1] = numHexa[rest];
     checksum[0] = numHexa[quotient];
   }
-
+  SERIAL_PRINT("chk: ", checksum);
   return checksum;
 
 
@@ -540,4 +544,37 @@ void servoRefresh(int servoPos) {
     }
   }
 }
+//----------------------------------------------------------------------------//
+char* readCard() {
+  static byte buffer_read[18];
+  byte block = 4;
+  byte len = 18;
+  status = rfid.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, 4, &key, &(rfid.uid));
 
+  if (status != MFRC522::STATUS_OK) {
+    SERIAL_PRINT(F("> Authentication failed: "), rfid.GetStatusCodeName(status));
+    return ERROR_READ_CARD;
+  }
+
+  status = rfid.MIFARE_Read(block, buffer_read, &len);
+  if (status != MFRC522::STATUS_OK) {
+    SERIAL_PRINT(F("Reading failed: "), rfid.GetStatusCodeName(status));
+    return ERROR_READ_CARD;
+  }
+/*
+  //print data card.
+  SERIAL_PRINT_("Data Card: ", "");
+  for (uint8_t i = 2; i < 16; i++)
+  {
+    if (buffer_read[i] != 32)
+    {
+      SERIAL_PRINT_((char)buffer_read[i], "");
+    }
+  }
+  SERIAL_PRINT("\n", "");
+  */
+  rfid.PICC_HaltA();
+  rfid.PCD_StopCrypto1();
+  buffer_read [5] = '\0';
+  return buffer_read + 2;
+}
