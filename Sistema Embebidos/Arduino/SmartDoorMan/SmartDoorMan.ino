@@ -8,8 +8,10 @@
 #define RST_PIN          9           // Pin reset RFID.
 #define SS_PIN           10          // Slave Select pin RFID.
 #define BUZZER           2           // pin Buzzer.
-#define PULSADOR         3           // pin Pulsador.
+#define HW_IRQ           3           // pin de detección de irq de hw externa.
 #define SERVO_MOTOR      4           // servo motor signal.
+#define PULSADOR         6           // pin Pulsador.
+#define FIN_DE_CARRERA   5           // fin de carrera puerta.     
 //---------------------------------------------------------------------------//
 
 MFRC522 rfid(SS_PIN, RST_PIN);
@@ -26,12 +28,6 @@ SoftwareSerial SoftSerial(7, 8); // RX, TX
 #define DELIMITER_CHARACTER '|'
 #define START_CHARACTER 'S'
 #define END_CHARACTER 'F'
-
-/*
-  #define DELIMITER_CHARACTER (int8_t)0xAE
-  #define START_CHARACTER (int8_t)0x91
-  #define END_CHARACTER (int8_t)0x92
-*/
 #define SERIAL_PRINT(x,y)        SoftSerial.print(x);SoftSerial.println(y);
 #define SERIAL_PRINT_(x,y)       SoftSerial.print(x);SoftSerial.print(y);
 #endif
@@ -53,6 +49,7 @@ SoftwareSerial SoftSerial(7, 8); // RX, TX
 #define SIZE_PAYLOAD     40
 #define SIZE_PACKAGE     SIZE_PAYLOAD + 7
 #define SIZE_CHECKSUM    3
+#define SIZE_MSG_QUEUE 10
 
 enum buzzerBeep {
   ONE_BEEP_SHORT = 0b01000000,
@@ -68,6 +65,7 @@ enum msgDisplay {
   MSG_DING_DONG,
   MSG_OPEN_DOOR,
   MSG_CLOSE_DOOR,
+  MSG_INVALID_CARD,
 };
 
 enum commands {
@@ -92,6 +90,11 @@ String receivedPackage = "";
 bool   packageComplete = false;
 int    servoPos = CLOSE;
 bool   closeDoor = false;
+bool   openDoor = false;
+int    msgQueue[SIZE_MSG_QUEUE];
+int    idx = 0;
+bool    block = false;
+
 
 //------------------------------- Prototipos de funciones --------------------------------//
 
@@ -106,15 +109,26 @@ bool  validatePackage(const char *package, int length);
 char  *disarmPackage(const char *package, int length);
 int   disarmPayLoad(const char *payLoad, int length, char *data);
 int   proccesPackage(String package, int length);
+char* readCard(void);
+void  refreshServoPos(void);
+bool  checkPackageComplete(void);
+void  refresh_LCD(void);
+bool  check_RFID_Card(void);
+void  push_Msg_inQueue(int msgNumber);
+int   pop_Msg_fromQueue(void);
 
 //----------------------------------------------------------------------------------------//
 
 void setup() {
-  pinMode(4, OUTPUT);
-  pinMode(BUZZER, OUTPUT);
-  pinMode(PULSADOR, INPUT_PULLUP);
-  SoftSerial.begin(9600);
-  Serial.begin(9600);
+
+  pinMode(SERVO_MOTOR, OUTPUT);         //
+  pinMode(BUZZER, OUTPUT);              // Seteo de los
+  pinMode(HW_IRQ, INPUT_PULLUP);        // pines.
+  pinMode(PULSADOR, INPUT_PULLUP);      //
+  pinMode(FIN_DE_CARRERA, INPUT_PULLUP);//
+
+  SoftSerial.begin(9600);               // Configuración baud rate usado para la comunicación con raspberry
+  Serial.begin(9600);                   // y la del puerto serial(por sw) para debug.
 
   lcd.init();                           // inicializacion del display
   lcd.backlight();                      // backLigth on.
@@ -136,119 +150,39 @@ void setup() {
   interrupts ();          // activar todas las interrupciones.
 
 
-  printMsg(MSG_WELCOME);
+  //printMsg(MSG_WELCOME);
+  push_Msg_inQueue(MSG_WELCOME);
   SERIAL_PRINT(F("\n> Inicialización finalizada."), "");
 
-  attachInterrupt(digitalPinToInterrupt(PULSADOR), ISR_HW, FALLING);
+  attachInterrupt(digitalPinToInterrupt(HW_IRQ), ISR_HW, LOW);
   receivedPackage.reserve(200);
-  char msg[] = "01|Abrir Puerta";
-  char msg1[] = "08|Cerrar Puerta";
-
-  char pakage[SIZE_PACKAGE];
-  char payLoad[SIZE_PAYLOAD];
-  SERIAL_PRINT(F("\npayLoad: "), msg);
-  strcpy(pakage, preparePackage(msg, strlen(msg)));
-  SERIAL_PRINT(F("Package: "), pakage);
-
-  SERIAL_PRINT(F("\npayLoad: "), msg1);
-  strcpy(pakage, preparePackage(msg1, strlen(msg1)));
-  SERIAL_PRINT(F("Package: "), pakage);
 
 }
 
+
 void loop() {
-
-  if (closeDoor == true) {
-    closeDoor = false;
-    servoPos = CLOSE;
-    printMsg(MSG_CLOSE_DOOR);
+  
+  check_RFID_Card();
+  refresh_LCD();
+  checkPackageComplete();
+  
+  if (idx == 0) {
+    push_Msg_inQueue(MSG_APPROACH_CARD);
   }
 
-  if (packageComplete) {
-    packageComplete = false;
-    int retCmd = proccesPackage(receivedPackage, receivedPackage.length());
-
-    if (retCmd == ERROR_CODE) {
-      SERIAL_PRINT("> Error unknown command !!", "");
-    }
-    else if (retCmd == ERROR_BAD_CHECKSUM) {
-      SERIAL_PRINT("> Error bad checksum!!", "");
-    }
-    else {
-      switch (retCmd) {
-        case OPEN_DOOR:
-          SERIAL_PRINT(F("> Command Open Door"), "");
-          servoPos = OPEN;
-          printMsg(MSG_OPEN_DOOR);
-          break;
-
-        case CLOSE_DOOR:
-          SERIAL_PRINT(F("> Command Close Door"), "");
-          servoPos = CLOSE;
-          printMsg(MSG_CLOSE_DOOR);
-          break;
-
-        case CARD_VALID:
-          SERIAL_PRINT(F("> Command Card Valid"), "");
-          break;
-
-        case CARD_NOT_VALID:
-          SERIAL_PRINT(F("> Command Card not Valid"), "");
-          break;
-
-        case ACK_BUTTON_PRESSED:
-          SERIAL_PRINT(F("> Command ACK button pressed"), "");
-          break;
-
-        case ACK_OPEN_DOOR:
-          SERIAL_PRINT(F("> Command ACK Open Door"), "");
-          break;
-      }
-    }
-  }
-
-  if (refreshDisplay == true) {
-    printMsg(msgNumber);
-    refreshDisplay = false;
-  }
-
-  if (checkCardInField == true) {
-    checkCardInField = false;
-    if (rfid.PICC_IsNewCardPresent()) {
-      SERIAL_PRINT(F("\n> Tarjeta sobre el Lector"), "");
-      msgNumber = MSG_CARD_IN_FIELD;
-      beepMode = ONE_BEEP_SHORT;
-      if (rfid.PICC_ReadCardSerial()) {
-        //rfid.PICC_DumpDetailsToSerial(&(rfid.uid));
-        char cmd[] = "05";
-        char payLoad[10];
-        char pakage[50];
-        snprintf(payLoad, sizeof(payLoad), "%s%c%s", cmd, (char)DELIMITER_CHARACTER, "04");
-        SERIAL_PRINT(F("payLoad: "), payLoad);
-        strcpy(pakage, preparePackage(payLoad, strlen(payLoad)));
-        SERIAL_PRINT(F("package: "), pakage);
-        Serial.print(pakage);
-        SERIAL_PRINT("> Data Card: ",readCard());
-      }
-    }
-    else {
-      msgNumber = MSG_APPROACH_CARD;
-    }
-  }
-
-
+  refreshServoPos();
+  
 }
 
 //----------------------------------------------------------------------------//
 void printMsg(int msgNumber) {
   static int lastMsgNumber = 99;
-  static bool block = false;
   static int blockCount = 0;
 
 
   if (block == true) {
     blockCount++;
-    if (blockCount > 3) {
+    if (blockCount >= 1) {
       blockCount = 0;
       block = false;
     }
@@ -266,7 +200,7 @@ void printMsg(int msgNumber) {
         printDisplay("Acerque su     ", "    Tarjeta ... ");
         break;
       case MSG_CARD_IN_FIELD:
-        printDisplay("Tarjeta sobre  ", "      el lector ");
+        printDisplay("Validando      ", "    Espere ...  ");
         break;
       case MSG_DING_DONG:
         printDisplay("  Ding         ", "     Dong ...   ");
@@ -277,9 +211,18 @@ void printMsg(int msgNumber) {
       case MSG_CLOSE_DOOR:
         printDisplay("Cerrando       ", "    Puerta ...  ");
         break;
-
+      case MSG_INVALID_CARD:
+        printDisplay("Tarjeta       ", "    Invalida !!  ");
+        break;
     }
+
   }
+  /*
+    else if (block == false) {
+    block = true;
+    blockCount = 0;
+    printDisplay("Acerque su     ", "    Tarjeta ... ");
+    }*/
 }
 //----------------------------------------------------------------------------//
 void printDisplay(const char *line1, const char *line2) {
@@ -299,8 +242,14 @@ void refreshBuzzer(void) {
 }
 //-------------------------- Pulsador Handler -------------------------------//
 void ISR_HW() {
-  msgNumber = MSG_DING_DONG;
-  refreshDisplay = true;
+  if (digitalRead(PULSADOR) == LOW) {
+    //msgNumber = MSG_DING_DONG;
+    //refreshDisplay = true;
+    push_Msg_inQueue(MSG_DING_DONG);
+  }
+  if (digitalRead(FIN_DE_CARRERA) == LOW) {
+    closeDoor = true;
+  }
 }
 //--------------------------- Timer Handler ---------------------------------//
 ISR (TIMER1_OVF_vect) {
@@ -312,15 +261,6 @@ ISR (TIMER1_OVF_vect) {
   countCloseDoor++;
 
   servoRefresh(servoPos);
-  /*
-    if (servoPos == OPEN) {            // Activo retardo de cierre de cerradura.
-      countCloseDoor++;
-      if (countCloseDoor >= 500000) {
-        countCloseDoor = 0;
-        closeDoor = true;
-      }
-    }
-  */
 
   if (countRefresh >= 2083) {         // Tengo una interrupción de timer cada (1 / (16Mhz / 8)) * 48 = 24 uS ---> 24 uS * 2083 = 50 mS.
     countRefresh = 0;
@@ -401,9 +341,8 @@ char* calcChecksum(const char *data, int length) {
     checksum[1] = numHexa[rest];
     checksum[0] = numHexa[quotient];
   }
-  SERIAL_PRINT("chk: ", checksum);
+  //SERIAL_PRINT("chk: ", checksum);
   return checksum;
-
 
 }
 //--------------------------------------------------------------------------//
@@ -478,8 +417,8 @@ int disarmPayLoad(const char *payLoad, int length, char *data) {
   int cmd = atoi(command);
   if (cmd > 0 && cmd < 9) {
     //if (cmd == 6) {  // unico comando proveniente desde la raspberry con datos;
-    memcpy (data, payLoad + 3, (length - 3)*sizeof(char));
-    data[length - 3] = '\0';
+    memcpy (data, payLoad + 2, (length - 2)*sizeof(char));
+    data[length - 2] = '\0';
     // }
     return cmd;
   }
@@ -553,28 +492,182 @@ char* readCard() {
 
   if (status != MFRC522::STATUS_OK) {
     SERIAL_PRINT(F("> Authentication failed: "), rfid.GetStatusCodeName(status));
-    return ERROR_READ_CARD;
+    return NULL;
   }
 
   status = rfid.MIFARE_Read(block, buffer_read, &len);
   if (status != MFRC522::STATUS_OK) {
     SERIAL_PRINT(F("Reading failed: "), rfid.GetStatusCodeName(status));
-    return ERROR_READ_CARD;
+    return NULL;
   }
-/*     
-  //print data card.
-  SERIAL_PRINT_("Data Card: ", "");
-  for (uint8_t i = 2; i < 16; i++)
-  {
-    if (buffer_read[i] != 32)
+  /*
+    //print data card.
+    SERIAL_PRINT_("Data Card: ", "");
+    for (uint8_t i = 2; i < 16; i++)
     {
-      SERIAL_PRINT_((char)buffer_read[i], "");
+      if (buffer_read[i] != 32)
+      {
+        SERIAL_PRINT_((char)buffer_read[i], "");
+      }
     }
-  }
-  SERIAL_PRINT("\n", "");
+    SERIAL_PRINT("\n", "");
   */
   rfid.PICC_HaltA();
   rfid.PCD_StopCrypto1();
   buffer_read [5] = '\0';
   return buffer_read + 2;
 }
+
+//----------------------------------------------------------------------------//
+void refreshServoPos(void) {
+
+  if (closeDoor == true) {
+    closeDoor = false;
+    servoPos = CLOSE;
+    //printMsg(MSG_CLOSE_DOOR);
+    //msgNumber = MSG_CLOSE_DOOR;
+    //refreshDisplay = true;
+    push_Msg_inQueue(MSG_CLOSE_DOOR);
+  }
+
+  else if (openDoor == true) {
+    openDoor = false;
+    servoPos = OPEN;
+    //printMsg(MSG_OPEN_DOOR);
+    //msgNumber = MSG_OPEN_DOOR;
+    //refreshDisplay = true;
+    push_Msg_inQueue(MSG_OPEN_DOOR);
+  }
+}
+//----------------------------------------------------------------------------//
+bool  checkPackageComplete(void) {
+  if (packageComplete) {
+    packageComplete = false;
+    int retCmd = proccesPackage(receivedPackage, receivedPackage.length());
+
+    if (retCmd == ERROR_CODE) {
+      SERIAL_PRINT("> Error unknown command !!", "");
+    }
+    else if (retCmd == ERROR_BAD_CHECKSUM) {
+      SERIAL_PRINT("> Error bad checksum!!", "");
+    }
+    else {
+      switch (retCmd) {
+        case OPEN_DOOR:
+          SERIAL_PRINT(F("> Command Open Door"), "");
+          openDoor = true;
+          break;
+
+        case CLOSE_DOOR:
+          SERIAL_PRINT(F("> Command Close Door"), "");
+          closeDoor = true;
+          break;
+
+        case CARD_VALID:
+          SERIAL_PRINT(F("> Command Card Valid"), "");
+          openDoor = true;
+          break;
+
+        case CARD_NOT_VALID:
+          SERIAL_PRINT(F("> Command Card not Valid"), "");
+          //msgNumber = MSG_INVALID_CARD;
+          push_Msg_inQueue(MSG_INVALID_CARD);
+          //refreshDisplay = true;
+          break;
+
+        case ACK_BUTTON_PRESSED:
+          SERIAL_PRINT(F("> Command ACK button pressed"), "");
+          break;
+
+        case ACK_OPEN_DOOR:
+          SERIAL_PRINT(F("> Command ACK Open Door"), "");
+          break;
+      }
+    }
+    return true;
+  }
+  return false;
+}
+
+//----------------------------------------------------------------------------//
+void refresh_LCD() {
+
+  if (refreshDisplay == true) {
+    if (block == false) {
+      msgNumber = pop_Msg_fromQueue();
+    }
+    printMsg(msgNumber);
+    refreshDisplay = false;
+  }
+}
+//----------------------------------------------------------------------------//
+bool check_RFID_Card(void) {
+
+  if (checkCardInField == true) {
+    checkCardInField = false;
+    if (rfid.PICC_IsNewCardPresent()) {
+      SERIAL_PRINT(F("\n> Tarjeta sobre el Lector"), "");
+      //msgNumber = MSG_CARD_IN_FIELD;
+      push_Msg_inQueue(MSG_CARD_IN_FIELD);
+      beepMode = ONE_BEEP_SHORT;
+      if (rfid.PICC_ReadCardSerial()) {
+        //rfid.PICC_DumpDetailsToSerial(&(rfid.uid));
+        char cmd[] = "05";
+        char data[5];
+        char payLoad[20];
+        char pakage[50];
+
+        char *returnPointer  = readCard();
+
+        if (returnPointer != NULL) {
+          strcpy(data, returnPointer);
+          snprintf(payLoad, sizeof(payLoad), "%s%c%s", cmd, (char)DELIMITER_CHARACTER, data);
+          SERIAL_PRINT(F("payLoad: "), payLoad);
+          strcpy(pakage, preparePackage(payLoad, strlen(payLoad)));
+          SERIAL_PRINT(F("package: "), pakage);
+          SERIAL_PRINT("> Data Card: ", data);
+          Serial.println(pakage);
+
+        }
+      }
+      return true;
+    }
+    else
+      return false;
+    /*
+      else {
+      msgNumber = MSG_APPROACH_CARD;
+      }*/
+  }
+
+}
+//----------------------------------------------------------------------------//
+void  push_Msg_inQueue(int msgNumber) {
+
+  if (idx >= SIZE_MSG_QUEUE) {
+    return;
+  }
+  else {
+    msgQueue[idx] = msgNumber;
+    idx ++;
+  }
+}
+
+//----------------------------------------------------------------------------//
+int  pop_Msg_fromQueue(void) {
+  static int idx_ = 0;
+
+  if (idx_ < idx && idx != 0) {
+    int retMsg = msgQueue[idx_];
+    idx_++;
+    return retMsg;
+  }
+  if (idx_ >= idx) {
+    idx_ = 0;
+    idx = 0;
+    return 99;
+  }
+
+
+}
+
