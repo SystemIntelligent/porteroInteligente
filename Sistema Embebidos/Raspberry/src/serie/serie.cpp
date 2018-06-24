@@ -6,12 +6,13 @@
  */
 #include "serie.h"
 int fd = 0;
-char tmp[3];	//YO
+
 char vectorRecibido[TAMANO_MAXIMO];
 int tamanoRecibido;
 
 char* serie::checksum(const char * p, int length) {
-	int resultado=0;	//YO
+	static char tmp[3];	//YO
+	uint8_t resultado=0;	//YO
 
 	for (int idx = 0; idx < length; idx++) {
 		resultado = resultado ^ p[idx];
@@ -29,8 +30,8 @@ char* serie::checksum(const char * p, int length) {
 		}
 	} else {
 
-		int resto;
-		int cociente;
+		uint8_t resto;
+		uint8_t cociente;
 		char numHexa[] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
 				'a', 'b', 'c', 'd', 'e', 'f' };
 
@@ -41,8 +42,6 @@ char* serie::checksum(const char * p, int length) {
 		tmp[0] = numHexa[cociente];
 
 	}
-//		printf("%c ",tmp[0]);
-//		printf("%c ",tmp[1]);
 	return tmp;
 }
 
@@ -95,7 +94,7 @@ int serie::init(CallBack_t funcion, int velocidad) {
 	if (fd != 0)
 		return FALSE;
 
-	if ((fd = serialOpen("/dev/ttyAMA0", velocidad)) < 0) {
+	if ((fd = serialOpen("/dev/ttyUSB0", 9600)) < 0) {
 		fprintf(stderr, "No pudo abrirse el puerto serial: %s\n",
 				strerror(errno));
 		return FALSE;
@@ -124,11 +123,12 @@ int serie::prepare_pack(char * vec, int tam) {
 	char vectorTransmit[tam + 7];
 
 	//hace CHecksum
-	char * tmp = checksum(vec, tam);
+	char tmp[5];
+	strncpy(tmp,checksum(vec, tam),sizeof(tmp));
 	//ojo '/0'
 	sprintf((char*) vectorTransmit, "%c%c%s%c%s%c%c", INICIO_DAT, SEPARADOR,
 			vec, SEPARADOR, tmp, SEPARADOR, FIN_DAT);
-
+	cout << "envio: " << vectorTransmit << endl;
 	serialPrintf(fd, vectorTransmit);
 //	cout<<"Envioo"<<endl;
 // visualización de lo enviado.
@@ -139,3 +139,4 @@ int serie::prepare_pack(char * vec, int tam) {
 //	puts(" ");
 	return TRUE;
 }
+

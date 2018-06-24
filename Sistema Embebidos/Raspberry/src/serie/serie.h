@@ -14,9 +14,9 @@ static volatile bool disponibleRec=true;
 class serie {
 
 public:
-#define INICIO_DAT	0x91
-#define FIN_DAT 	0x92
-#define SEPARADOR	0xAE
+#define INICIO_DAT	'S'
+#define FIN_DAT 	'F'
+#define SEPARADOR	'|'
 #define SIZE_CHECKSUM    3
 #define ERROR_CODE      (-1)
 #define TAMANO_MAXIMO 256

@@ -7,7 +7,7 @@
 
 #include <sqlite/sqlite.h>
 
-#define PRINT_DEBUG_SQLITE(x,y)                  cout << x << y << endl;
+#define PRINT_DEBUG_SQLITE(x,y)                  cout <<"";// x << y << endl;
 
 namespace std {
 

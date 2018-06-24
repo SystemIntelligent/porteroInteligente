@@ -13,35 +13,51 @@
 #include <sqlite/sqlite.h>
 using namespace std;
 
-Comunicacion myserie;
-sqlite handlerSQlite("acceso.db");
-void eventoMain(int comando,int tam,void *vec);
+static Comunicacion myserie;
+static sqlite handlerSQlite("acceso.db");
+void eventoMain(int comando, int tam, void *vec);
 
 int main() {
 	myserie.init(eventoMain);
-//	handlerSQlite.init();
-//	cout << "\nSQLite: " << handlerSQlite.selectFirstItem("name","authorized_persons") << endl;
-	char comand='1';
-	char datos[1]={0xFF};
+	handlerSQlite.init();
 
-	while(true){
-		myserie.enviarDatos(comand,1,datos);
+	while (true) {
+
 		usleep(2000000);
 	}
 
 }
 
-void eventoMain(int comando,int tam,void *vec) {
+void eventoMain(int comando, int tam, void *vec) {
 
-	cout<<"TAMAÑO:"<<tam<<endl;
-	cout<<"> Command: "<<comando<<endl;
-	cout<<"> Data: "<< vec[0]<<endl;
-	if(comando==ACK_OPEN_DOOR){
+	cout << "> Command: " << comando << endl;
+	cout << "> Data: ";
+	char *vecChar = (char*) vec;
+	for (int idx = 0; idx < tam; idx++) {
+		printf("%c", vecChar[idx]);
+	}
+	cout << "\n";
+
+	if (comando == ACK_OPEN_DOOR) {
 		//HOLA
-	}else if (comando==BUTTON_PRESSED) {
+	} else if (comando == BUTTON_PRESSED) {
 		//RELLENO
-	}else if (comando==VALIDATE_CARD) {
-		//RELLENAR
+	} else if (comando == VALIDATE_CARD) {
+		char data[30];
+		memcpy(data, vec, 2 * sizeof(uint8_t));
+		data[2] = '\0';
+		char *returnCode = handlerSQlite.selectItem("card_id", data, "Name",
+				"authorized_persons");
+		if (returnCode != NULL) {
+			strcpy(data, returnCode);
+			cout << "Acceso Permitido: " << returnCode << endl;
+			myserie.enviarDatos(CARD_VALID + 48, strlen(data), data);
+		} else if (returnCode == NULL) {
+			cout << "Acceso Denegado: Tarjeta invalida" << endl;
+			strncpy(data,"trash",sizeof(data));
+			myserie.enviarDatos(CARD_NOT_VALID + 48,2,data);
+		}
+
 	}
 
 }

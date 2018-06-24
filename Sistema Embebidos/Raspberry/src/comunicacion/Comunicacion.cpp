@@ -85,7 +85,6 @@ void Comunicacion::procesarEntrada(void* vec,int tam){
 		// El checksum es valido
 		cout<<"> Checksum valido!!"<<endl;
 		strcpy(payLoad, disarmPackage(vector, tam));
-		cout<<"> PayLoad Disarmed: "<<endl;
 		int commandoRec = disarmPayLoad(payLoad, strlen(payLoad), vectorRec);
 		if (commandoRec != -1) {
 //			llamo al callBack del Main
