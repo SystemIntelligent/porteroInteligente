@@ -11,7 +11,9 @@
 #define HW_IRQ           3           // pin de detección de irq de hw externa.
 #define SERVO_MOTOR      4           // servo motor signal.
 #define PULSADOR         6           // pin Pulsador.
-#define FIN_DE_CARRERA   5           // fin de carrera puerta.     
+#define FIN_DE_CARRERA   5           // fin de carrera puerta.
+#define LDR              A7
+#define LED              A0
 //---------------------------------------------------------------------------//
 
 MFRC522 rfid(SS_PIN, RST_PIN);
@@ -45,11 +47,11 @@ SoftwareSerial SoftSerial(7, 8); // RX, TX
 #define CLOSE                    5
 #define OPEN                     65
 
-#define PACKAGE_FORMAT "%c%c%s%c%s%c%c" //start character + delimiter character + payLoad + delimiter character + checksum + delimiter character + end character.
+#define PACKAGE_FORMAT   "%c%c%s%c%s%c%c" //start character + delimiter character + payLoad + delimiter character + checksum + delimiter character + end character.
 #define SIZE_PAYLOAD     40
 #define SIZE_PACKAGE     SIZE_PAYLOAD + 7
 #define SIZE_CHECKSUM    3
-#define SIZE_MSG_QUEUE 10
+#define SIZE_MSG_QUEUE   10
 
 enum buzzerBeep {
   ONE_BEEP_SHORT = 0b01000000,
@@ -93,8 +95,11 @@ bool   closeDoor = false;
 bool   openDoor = false;
 int    msgQueue[SIZE_MSG_QUEUE];
 int    idx = 0;
-bool    block = false;
-
+bool   block = false;
+bool   refreshLDR = false;
+int    ldrValue;
+bool  led_state = false;
+bool  old_led_state;
 
 //------------------------------- Prototipos de funciones --------------------------------//
 
@@ -116,19 +121,25 @@ void  refresh_LCD(void);
 bool  check_RFID_Card(void);
 void  push_Msg_inQueue(int msgNumber);
 int   pop_Msg_fromQueue(void);
-
+void  refresh_LDR(void);
 //----------------------------------------------------------------------------------------//
 
 void setup() {
+
+  SoftSerial.begin(9600);               // Configuración baud rate usado para la comunicación con raspberry
+  Serial.begin(9600);                   // y la del puerto serial(por sw) para debug.
 
   pinMode(SERVO_MOTOR, OUTPUT);         //
   pinMode(BUZZER, OUTPUT);              // Seteo de los
   pinMode(HW_IRQ, INPUT_PULLUP);        // pines.
   pinMode(PULSADOR, INPUT_PULLUP);      //
   pinMode(FIN_DE_CARRERA, INPUT_PULLUP);//
+  pinMode(LDR, INPUT);                  //
+  pinMode(LED, OUTPUT);                 //
 
-  SoftSerial.begin(9600);               // Configuración baud rate usado para la comunicación con raspberry
-  Serial.begin(9600);                   // y la del puerto serial(por sw) para debug.
+  digitalWrite(LED, HIGH);
+
+
 
   lcd.init();                           // inicializacion del display
   lcd.backlight();                      // backLigth on.
@@ -149,8 +160,6 @@ void setup() {
   TIMSK1 = (1 << TOIE1);  // habilitar la interrupción del desbordamiento del temporizador.
   interrupts ();          // activar todas las interrupciones.
 
-
-  //printMsg(MSG_WELCOME);
   push_Msg_inQueue(MSG_WELCOME);
   SERIAL_PRINT(F("\n> Inicialización finalizada."), "");
 
@@ -159,19 +168,19 @@ void setup() {
 
 }
 
-
 void loop() {
-  
+
   check_RFID_Card();
-  refresh_LCD();
   checkPackageComplete();
-  
+  refresh_LCD();
+  refreshServoPos();
+  refresh_LDR();
+
   if (idx == 0) {
     push_Msg_inQueue(MSG_APPROACH_CARD);
   }
 
-  refreshServoPos();
-  
+
 }
 
 //----------------------------------------------------------------------------//
@@ -217,12 +226,7 @@ void printMsg(int msgNumber) {
     }
 
   }
-  /*
-    else if (block == false) {
-    block = true;
-    blockCount = 0;
-    printDisplay("Acerque su     ", "    Tarjeta ... ");
-    }*/
+
 }
 //----------------------------------------------------------------------------//
 void printDisplay(const char *line1, const char *line2) {
@@ -255,12 +259,16 @@ void ISR_HW() {
 ISR (TIMER1_OVF_vect) {
 
   static int countRefresh = 0;
-  static unsigned long countCloseDoor = 0;
+  static unsigned long countRefreshLDR = 0;
 
   countRefresh++;
-  countCloseDoor++;
-
+  countRefreshLDR++;
   servoRefresh(servoPos);
+
+  if (countRefreshLDR >= 84000 && refreshLDR == false) {
+    countRefreshLDR = 0;
+    refreshLDR = true;
+  }
 
   if (countRefresh >= 2083) {         // Tengo una interrupción de timer cada (1 / (16Mhz / 8)) * 48 = 24 uS ---> 24 uS * 2083 = 50 mS.
     countRefresh = 0;
@@ -341,7 +349,6 @@ char* calcChecksum(const char *data, int length) {
     checksum[1] = numHexa[rest];
     checksum[0] = numHexa[quotient];
   }
-  //SERIAL_PRINT("chk: ", checksum);
   return checksum;
 
 }
@@ -462,7 +469,7 @@ void servoRefresh(int servoPos) {
 
   if (servoLast != servoPos) {
     blockCount++;
-    if (blockCount > 50000) {
+    if (blockCount > 90000) {
       servoLast = servoPos;
       blockCount = 0;
       digitalWrite (SERVO_MOTOR, LOW);
@@ -500,18 +507,7 @@ char* readCard() {
     SERIAL_PRINT(F("Reading failed: "), rfid.GetStatusCodeName(status));
     return NULL;
   }
-  /*
-    //print data card.
-    SERIAL_PRINT_("Data Card: ", "");
-    for (uint8_t i = 2; i < 16; i++)
-    {
-      if (buffer_read[i] != 32)
-      {
-        SERIAL_PRINT_((char)buffer_read[i], "");
-      }
-    }
-    SERIAL_PRINT("\n", "");
-  */
+
   rfid.PICC_HaltA();
   rfid.PCD_StopCrypto1();
   buffer_read [5] = '\0';
@@ -524,18 +520,12 @@ void refreshServoPos(void) {
   if (closeDoor == true) {
     closeDoor = false;
     servoPos = CLOSE;
-    //printMsg(MSG_CLOSE_DOOR);
-    //msgNumber = MSG_CLOSE_DOOR;
-    //refreshDisplay = true;
     push_Msg_inQueue(MSG_CLOSE_DOOR);
   }
 
   else if (openDoor == true) {
     openDoor = false;
     servoPos = OPEN;
-    //printMsg(MSG_OPEN_DOOR);
-    //msgNumber = MSG_OPEN_DOOR;
-    //refreshDisplay = true;
     push_Msg_inQueue(MSG_OPEN_DOOR);
   }
 }
@@ -570,9 +560,7 @@ bool  checkPackageComplete(void) {
 
         case CARD_NOT_VALID:
           SERIAL_PRINT(F("> Command Card not Valid"), "");
-          //msgNumber = MSG_INVALID_CARD;
           push_Msg_inQueue(MSG_INVALID_CARD);
-          //refreshDisplay = true;
           break;
 
         case ACK_BUTTON_PRESSED:
@@ -634,10 +622,6 @@ bool check_RFID_Card(void) {
     }
     else
       return false;
-    /*
-      else {
-      msgNumber = MSG_APPROACH_CARD;
-      }*/
   }
 
 }
@@ -667,7 +651,29 @@ int  pop_Msg_fromQueue(void) {
     idx = 0;
     return 99;
   }
+}
+//----------------------------------------------------------------------------//
+void  refresh_LDR(void) {
+  if (refreshLDR == true) {
+    refreshLDR = false;
+    ldrValue = analogRead(LDR);
 
+    if (ldrValue < 350) {
+      led_state = true;
+    }
+    else if (ldrValue > 450) {
+      led_state = false;
+    }
+  }
+
+  if (led_state == true && old_led_state != led_state) {
+    old_led_state = led_state;
+    digitalWrite(LED, LOW);
+  }
+  else if (led_state == false && old_led_state != led_state) {
+    old_led_state = led_state;
+    digitalWrite(LED, HIGH);
+  }
 
 }
 
