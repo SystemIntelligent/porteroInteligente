@@ -3,6 +3,7 @@ package com.porterointeligente.unlamsoa.porterointeligente;
 import android.content.Intent;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -10,17 +11,21 @@ import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.Toast;
 
+import java.io.File;
+
 public class MainActivity extends AppCompatActivity {
     Button btnVideo;
     Button btnAudio;
     WebView ViewVideo;
-    String url="http://10.41.100.7:8080/?action=stream";
-    Boolean videoActivo=false;
+    String url="http://192.168.10.178:8080/?action=stream";
+    Boolean videoActivo=true;
     Boolean microfonoActivo=false;
+//    File file = new File(context.getFilesDir(), filename);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Log.i("Ejecuto","onCreate.");
         setContentView(R.layout.activity_main);
 
         btnVideo=(Button) findViewById(R.id.btnVideo);
@@ -28,12 +33,14 @@ public class MainActivity extends AppCompatActivity {
         ViewVideo=(WebView) findViewById(R.id.viewVideo);
         ViewVideo.setWebViewClient(new WebViewClient());
         WebSettings settings= ViewVideo.getSettings();
-        settings.setJavaScriptEnabled(true);
-        settings.setLoadsImagesAutomatically(true);
+        settings.setSupportZoom(true);
+        settings.setBuiltInZoomControls(true);
+//        settings.setJavaScriptEnabled(true);
+//        settings.setLoadsImagesAutomatically(true);
         cargarVideo(null);
 
     }
-    
+
     public void config(View view){
         Intent intent=new Intent(this,SetUrl.class);
         startActivityForResult(intent,1);
@@ -63,26 +70,22 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onSaveInstanceState(Bundle estado){
 //        Con el Bundle guardo el estado de la aplicacion, ante un reinicio, rotacion o inactividad prolongada.
-//        estado.putString("valor",valor.getText().toString());
+        estado.putString("url",url);
 //        estado.putDouble("porcentaje",porcentaje);
 //        estado.putString("resultado",resu.getText().toString());
-//        estado.putBoolean("checkD",desc.isChecked());
+        estado.putBoolean("videoActivo",videoActivo);
+        estado.putBoolean("microfonoActivo",microfonoActivo);
         super.onSaveInstanceState(estado);
     }
 
     @Override
     public void onRestoreInstanceState(Bundle estado){
         super.onRestoreInstanceState(estado);
-//        valor.setText(estado.getString("valor"));
+        url=estado.getString("url");
+        videoActivo= estado.getBoolean("videoActivo");
+        microfonoActivo= estado.getBoolean("microfonoActivo");
 //        porcentaje=estado.getDouble("porcentaje");
 //        resu.setText(estado.getString("resultado"));
-//
-//        if( estado.getBoolean("checkD")==true ){
-//            desc.setChecked(true);
-//            interes.setChecked(false);
-//        }else{
-//            desc.setChecked(false);
-//            interes.setChecked(true);
-//        }
+        ViewVideo.loadUrl(url);
     }
 }

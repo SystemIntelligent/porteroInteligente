@@ -1,0 +1,42 @@
+{
+  "project_info": {
+    "project_number": "50805745290",
+    "firebase_url": "https://porterointeligente-e7699.firebaseio.com",
+    "project_id": "porterointeligente-e7699",
+    "storage_bucket": "porterointeligente-e7699.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:50805745290:android:13d5042fc39c4ac8",
+        "android_client_info": {
+          "package_name": "com.porterointeligente.unlamsoa.porterointeligente"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "50805745290-17muehgq9vqr7iqeopj2ca2pre2jjd76.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAGi5S6F_oCm1_X0X58yTIXfTSbn1Zt0F0"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 1,
+          "other_platform_oauth_client": []
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

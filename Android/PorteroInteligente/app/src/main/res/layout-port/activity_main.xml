@@ -20,9 +20,9 @@
 
             <Button
                 android:id="@+id/button3"
-                android:layout_width="10dp"
+                android:layout_width="6dp"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
+                android:layout_weight="2"
                 android:background="@drawable/iconomenu"
                 android:onClick="config" />
 
@@ -30,7 +30,7 @@
                 android:id="@+id/btnVideo"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
+                android:layout_weight="4"
                 android:onClick="cargarVideo"
                 android:text="Ver Video" />
 
@@ -38,7 +38,7 @@
                 android:id="@+id/btnAudio"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
+                android:layout_weight="4"
                 android:text="AUDIO" />
 
         </LinearLayout>

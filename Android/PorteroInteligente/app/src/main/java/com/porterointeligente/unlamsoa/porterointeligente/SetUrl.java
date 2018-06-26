@@ -25,4 +25,20 @@ public class SetUrl extends AppCompatActivity {
         setResult(RESULT_OK, intent);
         finish(); //termino la actividad y vuelve a la que la llamo
     }
+    @Override
+    public void onSaveInstanceState(Bundle estado){
+//        Con el Bundle guardo el estado de la aplicacion, ante un reinicio, rotacion o inactividad prolongada.
+        estado.putString("url",path.getText().toString());
+        super.onSaveInstanceState(estado);
+    }
+
+    @Override
+    public void onRestoreInstanceState(Bundle estado){
+        super.onRestoreInstanceState(estado);
+        path.setText(estado.getString("url").toString());
+    }
+
+
+
+
 }

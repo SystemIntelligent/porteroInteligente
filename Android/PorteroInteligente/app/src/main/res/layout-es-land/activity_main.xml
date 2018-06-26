@@ -15,17 +15,24 @@
             android:orientation="horizontal">
 
             <Button
+                android:id="@+id/button3"
+                android:layout_width="5dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="@drawable/iconomenu"
+                android:onClick="config" />
+            <Button
                 android:id="@+id/btnVideo"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
+                android:layout_weight="4"
                 android:text="Ver Video" />
 
             <Button
                 android:id="@+id/btnAudio"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
+                android:layout_weight="4"
                 android:text="AUDIO" />
 
         </LinearLayout>
