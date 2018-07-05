@@ -1,24 +1,32 @@
 package com.porterointeligente.unlamsoa.porterointeligente;
 
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
-import android.hardware.SensorListener;
 import android.hardware.SensorManager;
+import android.media.AudioManager;
+import android.net.rtp.AudioCodec;
+import android.net.rtp.AudioGroup;
+import android.net.rtp.AudioStream;
+import android.net.rtp.RtpStream;
+import android.os.StrictMode;
+import android.preference.PreferenceManager;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.view.WindowManager;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
-import android.widget.CompoundButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.io.File;
+import java.net.InetAddress;
 
 public class MainActivity extends AppCompatActivity implements SensorEventListener {
     Button btnVideo;
@@ -30,19 +38,30 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     Boolean microfonoActivo=false;
     private SensorManager      sensor;
     private final static float ACC = 30;
+    SharedPreferences dato;
+    AudioManager audio;
+    AudioGroup audioGroup;
+    AudioStream audioStream;
+
 
 //    File file = new File(context.getFilesDir(), filename);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        //obtengo el Shared Preferences de mi aplicacion.
+        dato= PreferenceManager.getDefaultSharedPreferences(this);
+        //Obtengo datos del Shared Preference. El 1 parametro es la clave, el 2 es el valor por defecto si no lo encuentra.
+        url=dato.getString("url",url);
+        videoActivo=!dato.getBoolean("videoActivo",videoActivo);
+        microfonoActivo=dato.getBoolean("microfonoActivo",microfonoActivo);
         Log.i("Ejecuto","onCreate.");
         setContentView(R.layout.activity_main);
         sensor = (SensorManager) getSystemService(SENSOR_SERVICE);
         btnVideo=(Button) findViewById(R.id.btnVideo);
         btnAudio=(Button) findViewById(R.id.btnAudio);
         ViewVideo=(WebView) findViewById(R.id.viewVideo);
-        textVieww=(TextView) findViewById(R.id.textView2);
+        textVieww= findViewById(R.id.textView2);
         ViewVideo.setWebViewClient(new WebViewClient());
         WebSettings settings= ViewVideo.getSettings();
         settings.setSupportZoom(true);
@@ -61,12 +80,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         {
             Toast.makeText(this, "No soporta Shake", Toast.LENGTH_SHORT).show();
 
-        }
-        Toast.makeText(this, "Soporta Shake", Toast.LENGTH_SHORT).show();
+        }else Toast.makeText(this, "Soporta Shake", Toast.LENGTH_SHORT).show();
+
     }
 
     public void config(View view){
         Intent intent=new Intent(this,SetUrl.class);
+        intent.putExtra("url",url);
         startActivityForResult(intent,1);
     }
 
@@ -81,9 +101,19 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     @Override
     protected void onResume() {
         super.onResume();
+    }
 
-
-
+    @Override
+    protected void onPause() {
+        super.onPause();
+        //Hago editable este objeto
+        SharedPreferences.Editor miEditor=dato.edit();
+        //pongo la información que quiero editar.
+        miEditor.putString("url",url);
+        miEditor.putBoolean("videoActivo",videoActivo);
+        miEditor.putBoolean("microfonoActivo",microfonoActivo);
+        //Guardo los cambios de miEditor en el Shared Preference.
+        miEditor.apply();
     }
 
 
@@ -91,10 +121,22 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         if(videoActivo==true){
             videoActivo=false;
             ViewVideo.setVisibility(View.INVISIBLE);
+            ViewVideo.stopLoading();
         }else{
             videoActivo=true;
             ViewVideo.setVisibility(View.VISIBLE);
             ViewVideo.loadUrl(url);
+        }
+    }
+
+    public void PresionAudio(View view){
+        Intent intent=new Intent(MainActivity.this, ServicioAudio.class);
+        if(microfonoActivo==true){
+            microfonoActivo=false;
+            stopService(intent);
+        }else{
+            microfonoActivo=true;
+            startService(intent);
         }
     }
 
@@ -118,7 +160,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         microfonoActivo= estado.getBoolean("microfonoActivo");
 //        porcentaje=estado.getDouble("porcentaje");
 //        resu.setText(estado.getString("resultado"));
-        ViewVideo.loadUrl(url);
+        if(videoActivo==true){
+            ViewVideo.setVisibility(View.VISIBLE);
+            ViewVideo.loadUrl(url);
+        }else ViewVideo.setVisibility(View.INVISIBLE);
     }
 
     @Override

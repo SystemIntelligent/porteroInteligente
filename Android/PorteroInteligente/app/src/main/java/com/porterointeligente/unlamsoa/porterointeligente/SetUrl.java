@@ -9,18 +9,23 @@ import android.widget.EditText;
 public class SetUrl extends AppCompatActivity {
     EditText path;
 
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.seturl);
-        path=(EditText) findViewById(R.id.editText);
+        path=findViewById(R.id.editText);
+        path.setText(getIntent().getExtras().getString("url","http://"));
     }
 
 
     public void terminar(View view){
+        String dato=path.getText().toString().toLowerCase();
+        //agrego http://
+        if(dato.startsWith("http://")==false){
+            dato="http://"+dato;
+        }
         Intent intent = new Intent();
-        intent.putExtra("url",path.getText().toString());
+        intent.putExtra("url",dato);
 
         setResult(RESULT_OK, intent);
         finish(); //termino la actividad y vuelve a la que la llamo
@@ -35,10 +40,6 @@ public class SetUrl extends AppCompatActivity {
     @Override
     public void onRestoreInstanceState(Bundle estado){
         super.onRestoreInstanceState(estado);
-        path.setText(estado.getString("url").toString());
+        path.setText(estado.getString("url"));
     }
-
-
-
-
 }
