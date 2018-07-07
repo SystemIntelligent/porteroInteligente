@@ -21,7 +21,6 @@ import java.net.UnknownHostException;
 import java.util.Enumeration;
 
 public class ServicioAudio extends Service {
-    String ip="10.41.101.10";
     AudioManager audio;
     AudioGroup audioGroup;
     AudioStream audioStream;
@@ -53,9 +52,9 @@ public class ServicioAudio extends Service {
 
 //            audioStream.setCodec(AudioCodec.AMR);
 
-            audioStream.setMode(RtpStream.MODE_NORMAL);
+            audioStream.setMode(RtpStream.MODE_SEND_ONLY);
             //set receiver(vlc player) machine ip address(please update with your machine ip)
-            audioStream.associate(InetAddress.getByAddress(new byte[] {(byte)10, (byte)41, (byte)100, (byte)254 }), 5050);
+            audioStream.associate(InetAddress.getByAddress(new byte[] {(byte)10, (byte)41, (byte)100, (byte)58 }), 5050);
 //            audioStream.join(audioGroup);
 
         }catch (Exception e) {
@@ -96,6 +95,12 @@ public class ServicioAudio extends Service {
         Toast.makeText(this,"Servicio detenido",Toast.LENGTH_SHORT).show();
 //        AudioManager audio = (AudioManager)getSystemService(AUDIO_SERVICE);
         audio.setSpeakerphoneOn(false);
+        audioGroup.clear();
+        try {
+            this.finalize();
+        } catch (Throwable throwable) {
+            throwable.printStackTrace();
+        }
 
     }
 
@@ -103,7 +108,9 @@ public class ServicioAudio extends Service {
     //Despues de onCreate automaticamente se ejecuta a OnstartCommand,
     //idArranque: Es el id del servicio a ejecutar
     @Override
-    public int onStartCommand(Intent intenc, int flags, int idArranque){
+    public int onStartCommand(Intent inten, int flags, int idArranque){
+        inten.getExtras().getString("ipAudio");
+        inten.getExtras().getInt("puerto");
         audioStream.join(audioGroup);
         Toast.makeText(this,"Servicio onStartCommand",Toast.LENGTH_SHORT).show();
 

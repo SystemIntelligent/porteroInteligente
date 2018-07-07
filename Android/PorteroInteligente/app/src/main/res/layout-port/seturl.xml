@@ -19,16 +19,15 @@
             android:id="@+id/textView"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Ingrese la URL" />
+            android:text="Ingrese la ip de la raspberry" />
 
         <EditText
             android:id="@+id/editText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:ems="10"
-            android:hint="url"
-            android:inputType="textPersonName"
-            android:text="http://" />
+            android:hint="Ejemplo : 192.168.1.30"
+            android:inputType="textPersonName" />
 
         <Button
             android:id="@+id/button"

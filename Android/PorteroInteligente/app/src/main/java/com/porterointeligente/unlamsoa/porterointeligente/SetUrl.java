@@ -21,9 +21,9 @@ public class SetUrl extends AppCompatActivity {
     public void terminar(View view){
         String dato=path.getText().toString().toLowerCase();
         //agrego http://
-        if(dato.startsWith("http://")==false){
-            dato="http://"+dato;
-        }
+//        if(dato.startsWith("http://")==false){
+//            dato="http://"+dato;
+//        }
         Intent intent = new Intent();
         intent.putExtra("url",dato);
 
