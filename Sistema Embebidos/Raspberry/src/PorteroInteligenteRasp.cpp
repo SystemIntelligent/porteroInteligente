@@ -50,12 +50,12 @@ void eventoMain(int comando, int tam, void *vec) {
 				"authorized_persons");
 		if (returnCode != NULL) {
 			strcpy(data, returnCode);
-			cout << "Acceso Permitido: " << returnCode << endl;
+			cout << "Acceso Permitido: " << returnCode << "\n" << endl;
 			myserie.enviarDatos(CARD_VALID + 48, strlen(data), data);
 		} else if (returnCode == NULL) {
-			cout << "Acceso Denegado: Tarjeta invalida" << endl;
-			strncpy(data,"trash",sizeof(data));
-			myserie.enviarDatos(CARD_NOT_VALID + 48,2,data);
+			cout << "Acceso Denegado: Tarjeta invalida" << "\n" << endl;
+			strncpy(data, "trash", sizeof(data));
+			myserie.enviarDatos(CARD_NOT_VALID + 48, 2, data);
 		}
 
 	}

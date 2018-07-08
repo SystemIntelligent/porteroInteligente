@@ -14,6 +14,7 @@
 #define FIN_DE_CARRERA   5           // fin de carrera puerta.
 #define LDR              A7
 #define LED              A0
+#define RELE             A1
 //---------------------------------------------------------------------------//
 
 MFRC522 rfid(SS_PIN, RST_PIN);
@@ -98,8 +99,11 @@ int    idx = 0;
 bool   block = false;
 bool   refreshLDR = false;
 int    ldrValue;
-bool  led_state = false;
-bool  old_led_state;
+bool   led_state = false;
+bool   old_led_state;
+bool   sendDingDongPack = false;
+int    pwm_cont = 0;
+int    pwm_duty = 255;
 
 //------------------------------- Prototipos de funciones --------------------------------//
 
@@ -126,7 +130,7 @@ void  refresh_LDR(void);
 
 void setup() {
 
-  SoftSerial.begin(9600);               // Configuración baud rate usado para la comunicación con raspberry
+  SoftSerial.begin(2400);               // Configuración baud rate usado para la comunicación con raspberry
   Serial.begin(9600);                   // y la del puerto serial(por sw) para debug.
 
   pinMode(SERVO_MOTOR, OUTPUT);         //
@@ -136,10 +140,11 @@ void setup() {
   pinMode(FIN_DE_CARRERA, INPUT_PULLUP);//
   pinMode(LDR, INPUT);                  //
   pinMode(LED, OUTPUT);                 //
+  pinMode(RELE, OUTPUT);                 //
 
-  digitalWrite(LED, HIGH);
+  digitalWrite(RELE, HIGH);
 
-
+  digitalWrite(LED, LOW);
 
   lcd.init();                           // inicializacion del display
   lcd.backlight();                      // backLigth on.
@@ -169,17 +174,30 @@ void setup() {
 }
 
 void loop() {
-
+  refresh_LDR();
   check_RFID_Card();
   checkPackageComplete();
   refresh_LCD();
   refreshServoPos();
-  refresh_LDR();
 
   if (idx == 0) {
     push_Msg_inQueue(MSG_APPROACH_CARD);
   }
+  if (sendDingDongPack == true) {
+    sendDingDongPack = false;
+    SERIAL_PRINT(F("\n> ding dong."), "");
 
+    char cmd[] = "01";
+    char data[5];
+    char payLoad[20];
+    char pakage[50];
+
+    snprintf(payLoad, sizeof(payLoad), "%s%c%s", cmd, (char)DELIMITER_CHARACTER, "Ding-Dong");
+    SERIAL_PRINT(F("payLoad: "), payLoad);
+    strcpy(pakage, preparePackage(payLoad, strlen(payLoad)));
+    SERIAL_PRINT("pakage: ", pakage);
+    Serial.println(pakage);
+  }
 
 }
 
@@ -197,7 +215,7 @@ void printMsg(int msgNumber) {
     }
   }
 
-  if ((lastMsgNumber != msgNumber)&& block == false) {
+  if ((lastMsgNumber != msgNumber) && block == false) {
     lastMsgNumber = msgNumber;
     block = true;
     blockCount = 0;
@@ -251,6 +269,7 @@ void ISR_HW() {
     //refreshDisplay = true;
     push_Msg_inQueue(MSG_DING_DONG);
     refreshDisplay = true;
+    sendDingDongPack = true;
   }
   if (digitalRead(FIN_DE_CARRERA) == LOW) {
     closeDoor = true;
@@ -266,21 +285,22 @@ ISR (TIMER1_OVF_vect) {
   countRefreshLDR++;
   servoRefresh(servoPos);
 
-  if (countRefreshLDR >= 84000 && refreshLDR == false) {
+  if (countRefreshLDR >= 24000 && refreshLDR == false) {  // Se actualiza la lectura del ldr cada 2 seg aprx. 24uS * 24000 = 1.016 Seg.
     countRefreshLDR = 0;
     refreshLDR = true;
   }
 
   if (countRefresh >= 2083) {         // Tengo una interrupción de timer cada (1 / (16Mhz / 8)) * 48 = 24 uS ---> 24 uS * 2083 = 50 mS.
     countRefresh = 0;
+
     refreshBuzzer();
     countAux0Timer++;
-    if (countAux0Timer == 7) {
+    if (countAux0Timer == 7) {       // Verificación de tarjeta sobre el lector, cada 50mS * 7 = 350mS.
       countAux0Timer = 0;
       checkCardInField = true;
     }
 
-    countAux1Timer++;
+    countAux1Timer++;                // Actualización del display cada 50mS * 3 = 150 mS.
     if (countAux1Timer == 3) {
       countAux1Timer = 0;
       refreshDisplay = true;
@@ -288,7 +308,6 @@ ISR (TIMER1_OVF_vect) {
   }
 
   TCNT1 = 65487;                   // (1 / (16Mhz / 8)) * 48 = 24 us * 127 = 3mS ---> período de la señal PWM requerida por el servo motor.
-
 }
 //-------------------------- Evento Serial Handler -------------------------//
 void serialEvent() {
@@ -435,19 +454,19 @@ int disarmPayLoad(const char *payLoad, int length, char *data) {
 //--------------------------------------------------------------------------//
 int proccesPackage(String package, int length) {
 
-  SERIAL_PRINT(F("\n> Recieved Package: "), package);
+  SERIAL_PRINT("\n> Recieved Package: ", package);
   char  recievedPack[SIZE_PACKAGE];
   char  payLoad[SIZE_PAYLOAD];
   package.toCharArray(recievedPack, sizeof(recievedPack));
   if (validatePackage(recievedPack, strlen(recievedPack))) {
-    SERIAL_PRINT(F("> Checksum valid!!"), "");
+    SERIAL_PRINT("> Checksum valid!!", "");
     strcpy(payLoad, disarmPackage(recievedPack, strlen(recievedPack)));
-    SERIAL_PRINT(F("> PayLoad Disarmed: "), payLoad);
+    SERIAL_PRINT("> PayLoad Disarmed: ", payLoad);
     char data[50];
     int command = disarmPayLoad(payLoad, strlen(payLoad), data);
     if (command != -1) {
-      SERIAL_PRINT(F("> Command: "), command);
-      SERIAL_PRINT(F("> Data: "), data);
+      SERIAL_PRINT("> Command: ", command);
+      SERIAL_PRINT("> Data: ", data);
       return command;
     }
     else {
@@ -499,13 +518,13 @@ char* readCard() {
   status = rfid.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, 4, &key, &(rfid.uid));
 
   if (status != MFRC522::STATUS_OK) {
-    SERIAL_PRINT(F("> Authentication failed: "), rfid.GetStatusCodeName(status));
+    SERIAL_PRINT("> Authentication failed: ", rfid.GetStatusCodeName(status));
     return NULL;
   }
 
   status = rfid.MIFARE_Read(block, buffer_read, &len);
   if (status != MFRC522::STATUS_OK) {
-    SERIAL_PRINT(F("Reading failed: "), rfid.GetStatusCodeName(status));
+    SERIAL_PRINT("Reading failed: ", rfid.GetStatusCodeName(status));
     return NULL;
   }
 
@@ -547,28 +566,28 @@ bool  checkPackageComplete(void) {
     else {
       switch (retCmd) {
         case OPEN_DOOR:
-          SERIAL_PRINT(F("> Command Open Door"), "");
+          SERIAL_PRINT("> Command Open Door", "");
           openDoor = true;
           break;
 
         case CLOSE_DOOR:
-          SERIAL_PRINT(F("> Command Close Door"), "");
+          SERIAL_PRINT("> Command Close Door", "");
           closeDoor = true;
           break;
 
         case CARD_VALID:
-          SERIAL_PRINT(F("> Command Card Valid"), "");
+          SERIAL_PRINT("> Command Card Valid", "");
           openDoor = true;
           break;
 
         case CARD_NOT_VALID:
-          SERIAL_PRINT(F("> Command Card not Valid"), "");
+          SERIAL_PRINT("> Command Card not Valid", "");
           push_Msg_inQueue(MSG_INVALID_CARD);
           refreshDisplay = true;
           break;
 
         case ACK_BUTTON_PRESSED:
-          SERIAL_PRINT(F("> Command ACK button pressed"), "");
+          SERIAL_PRINT("> Command ACK button pressed", "");
           break;
 
         case ACK_OPEN_DOOR:
@@ -600,7 +619,7 @@ bool check_RFID_Card(void) {
     if (rfid.PICC_IsNewCardPresent()) {
       SERIAL_PRINT(F("\n> Tarjeta sobre el Lector"), "");
       //msgNumber = MSG_CARD_IN_FIELD;
-     // push_Msg_inQueue(MSG_CARD_IN_FIELD);
+      // push_Msg_inQueue(MSG_CARD_IN_FIELD);
       beepMode = ONE_BEEP_SHORT;
       if (rfid.PICC_ReadCardSerial()) {
         //rfid.PICC_DumpDetailsToSerial(&(rfid.uid));
@@ -668,16 +687,33 @@ void  refresh_LDR(void) {
     else if (ldrValue > 450) {
       led_state = false;
     }
-  }
 
-  if (led_state == true && old_led_state != led_state) {
-    old_led_state = led_state;
+    if (led_state == true && old_led_state != led_state) {
+      old_led_state = led_state;
+      digitalWrite(RELE, HIGH);
+      //SERIAL_PRINT(F("\n> Rele on."), "");
+    }
+    else if (led_state == false && old_led_state != led_state) {
+      old_led_state = led_state;
+      digitalWrite(RELE, LOW);
+      //SERIAL_PRINT(F("\n> Rele off."), "");
+    }
+  }
+}
+//-----------------------------------------------------------------------------//
+void pwm_out(void) {
+  pwm_cont++;
+  if (pwm_cont >= 255) {
+    pwm_cont = 0;
     digitalWrite(LED, LOW);
   }
-  else if (led_state == false && old_led_state != led_state) {
-    old_led_state = led_state;
+  if (pwm_cont >= pwm_duty) {
+    digitalWrite(LED, LOW);
+  }
+  else {
     digitalWrite(LED, HIGH);
   }
-
 }
+
+
 
