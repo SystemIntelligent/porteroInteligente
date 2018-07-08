@@ -197,7 +197,7 @@ void printMsg(int msgNumber) {
     }
   }
 
-  if ((lastMsgNumber != msgNumber) && block == false) {
+  if ((lastMsgNumber != msgNumber)&& block == false) {
     lastMsgNumber = msgNumber;
     block = true;
     blockCount = 0;
@@ -250,6 +250,7 @@ void ISR_HW() {
     //msgNumber = MSG_DING_DONG;
     //refreshDisplay = true;
     push_Msg_inQueue(MSG_DING_DONG);
+    refreshDisplay = true;
   }
   if (digitalRead(FIN_DE_CARRERA) == LOW) {
     closeDoor = true;
@@ -280,7 +281,7 @@ ISR (TIMER1_OVF_vect) {
     }
 
     countAux1Timer++;
-    if (countAux1Timer == 5) {
+    if (countAux1Timer == 3) {
       countAux1Timer = 0;
       refreshDisplay = true;
     }
@@ -469,7 +470,7 @@ void servoRefresh(int servoPos) {
 
   if (servoLast != servoPos) {
     blockCount++;
-    if (blockCount > 90000) {
+    if (blockCount > 40000) {
       servoLast = servoPos;
       blockCount = 0;
       digitalWrite (SERVO_MOTOR, LOW);
@@ -521,12 +522,14 @@ void refreshServoPos(void) {
     closeDoor = false;
     servoPos = CLOSE;
     push_Msg_inQueue(MSG_CLOSE_DOOR);
+    refreshDisplay = true;
   }
 
   else if (openDoor == true) {
     openDoor = false;
     servoPos = OPEN;
     push_Msg_inQueue(MSG_OPEN_DOOR);
+    refreshDisplay = true;
   }
 }
 //----------------------------------------------------------------------------//
@@ -561,6 +564,7 @@ bool  checkPackageComplete(void) {
         case CARD_NOT_VALID:
           SERIAL_PRINT(F("> Command Card not Valid"), "");
           push_Msg_inQueue(MSG_INVALID_CARD);
+          refreshDisplay = true;
           break;
 
         case ACK_BUTTON_PRESSED:
@@ -596,7 +600,7 @@ bool check_RFID_Card(void) {
     if (rfid.PICC_IsNewCardPresent()) {
       SERIAL_PRINT(F("\n> Tarjeta sobre el Lector"), "");
       //msgNumber = MSG_CARD_IN_FIELD;
-      push_Msg_inQueue(MSG_CARD_IN_FIELD);
+     // push_Msg_inQueue(MSG_CARD_IN_FIELD);
       beepMode = ONE_BEEP_SHORT;
       if (rfid.PICC_ReadCardSerial()) {
         //rfid.PICC_DumpDetailsToSerial(&(rfid.uid));
