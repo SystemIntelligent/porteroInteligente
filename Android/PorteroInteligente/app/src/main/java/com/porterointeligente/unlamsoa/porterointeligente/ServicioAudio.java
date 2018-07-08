@@ -21,6 +21,8 @@ import java.net.UnknownHostException;
 import java.util.Enumeration;
 
 public class ServicioAudio extends Service {
+    String ipRemota="";
+    int puerto=0;
     AudioManager audio;
     AudioGroup audioGroup;
     AudioStream audioStream;
@@ -40,32 +42,7 @@ public class ServicioAudio extends Service {
     public void onCreate(){
         super.onCreate();
         Toast.makeText(this,"Servicio iniciado",Toast.LENGTH_SHORT).show();
-        StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
-        StrictMode.setThreadPolicy(policy);
-        try {
-            audio =  (AudioManager) getSystemService(Context.AUDIO_SERVICE);
-            audio.setMode(AudioManager.MODE_IN_COMMUNICATION);
-            audioGroup = new AudioGroup();
-            audioGroup.setMode(AudioGroup.MODE_NORMAL);
-            audioStream = new AudioStream(InetAddress.getByAddress(getLocalIPAddress ()));
-            audioStream.setCodec(AudioCodec.PCMU);
 
-//            audioStream.setCodec(AudioCodec.AMR);
-
-            audioStream.setMode(RtpStream.MODE_SEND_ONLY);
-            //set receiver(vlc player) machine ip address(please update with your machine ip)
-            audioStream.associate(InetAddress.getByAddress(new byte[] {(byte)10, (byte)41, (byte)100, (byte)58 }), 5050);
-//            audioStream.join(audioGroup);
-
-        }catch (Exception e) {
-            e.printStackTrace();
-            Toast.makeText(this,"Servicio fallo",Toast.LENGTH_SHORT).show();
-        }
-        try {
-            Toast.makeText(this,InetAddress.getByAddress(getLocalIPAddress ()).toString()+"YO",Toast.LENGTH_SHORT).show();
-        } catch (UnknownHostException e) {
-            e.printStackTrace();
-        }
 //        audioStream.getRemoteAddress()
     }
 
@@ -94,10 +71,13 @@ public class ServicioAudio extends Service {
         super.onDestroy();
         Toast.makeText(this,"Servicio detenido",Toast.LENGTH_SHORT).show();
 //        AudioManager audio = (AudioManager)getSystemService(AUDIO_SERVICE);
-        audio.setSpeakerphoneOn(false);
-        audioGroup.clear();
+//        audio.setSpeakerphoneOn(false);
+
         try {
-            this.finalize();
+            audioGroup.clear();
+//            this.finalize();
+            this.stopSelf();
+
         } catch (Throwable throwable) {
             throwable.printStackTrace();
         }
@@ -109,12 +89,73 @@ public class ServicioAudio extends Service {
     //idArranque: Es el id del servicio a ejecutar
     @Override
     public int onStartCommand(Intent inten, int flags, int idArranque){
-        inten.getExtras().getString("ipAudio");
-        inten.getExtras().getInt("puerto");
-        audioStream.join(audioGroup);
-        Toast.makeText(this,"Servicio onStartCommand",Toast.LENGTH_SHORT).show();
+        ipRemota=inten.getExtras().getString("ipAudio");
+        puerto=inten.getExtras().getInt("puerto");
+        if(iniciarAudio()==true){
+            audioStream.join(audioGroup);
+            Toast.makeText(this,"Servicio onStartCommand",Toast.LENGTH_SHORT).show();
 
-        return START_STICKY;
+            return START_STICKY;
+        }else {
+            audioGroup.clear();
+            try {
+                this.finalize();
+            } catch (Throwable throwable) {
+
+            }
+            return START_NOT_STICKY;
+        }
+
+
     }
 
+    protected boolean iniciarAudio(){
+        StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
+        StrictMode.setThreadPolicy(policy);
+        try {
+            audio =  (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+            audio.setMode(AudioManager.MODE_IN_COMMUNICATION);
+            audioGroup = new AudioGroup();
+            audioGroup.setMode(AudioGroup.MODE_NORMAL);
+            audioStream = new AudioStream(InetAddress.getByAddress(getLocalIPAddress ()));
+            audioStream.setCodec(AudioCodec.PCMU);
+
+            audioStream.setMode(RtpStream.MODE_SEND_ONLY);
+            //poner la ip de la raspberry que tiene que recibir el audio.
+//            audioStream.associate(InetAddress.getByAddress(new byte[] {(byte)192, (byte)168, (byte)1, (byte)132 }), 5050);
+            byte[] ip=obtenerIpDeString(ipRemota);
+            if(ip!=null){
+                audioStream.associate(InetAddress.getByAddress(ip), puerto);
+                return true;
+            }else return false;
+
+        }catch (Exception e) {
+//            e.printStackTrace();
+            Toast.makeText(this,"Servicio fallo",Toast.LENGTH_SHORT).show();
+            return false;
+        }
+    }
+
+
+
+
+    protected byte[] obtenerIpDeString(String ip) {
+        byte[] ipSeparada = new byte[4];
+        int[] ipEntera = new int[4];
+        String[] separated = ip.split("\\.");
+        if (separated.length != 4) {
+            return null;
+        }
+
+        try {
+            for (int i = 0; i < 4; i++) {
+                Log.e("        IP  ",separated[i]+" ");
+                ipEntera[i] = Integer.parseInt(separated[i]);
+                ipSeparada[i] = (byte) ipEntera[i];
+            }
+        } catch (Exception e) {
+            return null;
+        }
+        return ipSeparada;
+    }
 }
