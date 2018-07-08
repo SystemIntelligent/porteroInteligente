@@ -8,6 +8,7 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.media.AudioManager;
 import android.preference.PreferenceManager;
 import android.support.v4.app.NotificationCompat;
 import android.support.v7.app.AppCompatActivity;
@@ -102,7 +103,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     public void config(View view){
         Intent intent=new Intent(this,SetUrl.class);
-        intent.putExtra("url",url);
+        intent.putExtra("ip",ip);
         startActivityForResult(intent,1);
     }
 
@@ -148,12 +149,16 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         this.videoActivo=true;
         ViewVideo.setVisibility(View.VISIBLE);
         ViewVideo.loadUrl(url);
+        AudioManager audio = (AudioManager)getSystemService(AUDIO_SERVICE);
+        audio.setSpeakerphoneOn(true);
     }
 
     protected void apagarVideo(){
         videoActivo=false;
         ViewVideo.setVisibility(View.INVISIBLE);
         ViewVideo.stopLoading();
+        AudioManager audio = (AudioManager)getSystemService(AUDIO_SERVICE);
+        audio.setSpeakerphoneOn(false);
     }
     public void PresionAudio(View view){
         if(intentService==null){
@@ -163,7 +168,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         if(microfonoActivo==true){
             microfonoActivo=false;
             stopService(intentService);
+            intentService=null;
+            //apago Notificacion
             mNotifyMgr.cancel(1);
+            //mando a Firebase
             myRefMic.setValue("microfonoApagado");
 
         }else{
@@ -172,9 +180,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 intentService.putExtra("puerto", puertoAudio);
                 microfonoActivo = true;
                 myRefMic.setValue("microfonoActivo");
-                startService(intentService);
                 lanzarNotificacionMicActivo();
-                intentService = null;
+                startService(intentService);
             }
         }
     }
@@ -193,9 +200,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 .setVibrate(new long[] {100, 250, 100, 500})
                 .setAutoCancel(false);  //con esto le digo que no se cierre al apretar en la notificacion
         mBuilder.setOngoing(true); //con esto hago que no se pueda cerrar la notificacion.
+
+        mNotifyMgr.notify(1, mBuilder.build());
+
     }
-
-
 
 
     @Override

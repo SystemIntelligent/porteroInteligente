@@ -14,7 +14,7 @@ public class SetUrl extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.seturl);
         path=findViewById(R.id.editText);
-        path.setText(getIntent().getExtras().getString("url","http://"));
+        path.setText(getIntent().getExtras().getString("ip",""));
     }
 
 
