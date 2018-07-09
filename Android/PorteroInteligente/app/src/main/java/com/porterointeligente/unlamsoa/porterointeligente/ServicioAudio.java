@@ -62,7 +62,6 @@ public class ServicioAudio extends Service {
             Log.i("SocketException ", ex.toString());
         }
         return ip;
-
     }
 
     @Override
@@ -120,11 +119,12 @@ public class ServicioAudio extends Service {
             audioStream = new AudioStream(InetAddress.getByAddress(getLocalIPAddress ()));
             audioStream.setCodec(AudioCodec.PCMU);
 
-            audioStream.setMode(RtpStream.MODE_SEND_ONLY);
+            audioStream.setMode(RtpStream.MODE_NORMAL);
             //poner la ip de la raspberry que tiene que recibir el audio.
 //            audioStream.associate(InetAddress.getByAddress(new byte[] {(byte)192, (byte)168, (byte)1, (byte)132 }), 5050);
             byte[] ip=obtenerIpDeString(ipRemota);
             if(ip!=null){
+                //asocio para el envio del audio.
                 audioStream.associate(InetAddress.getByAddress(ip), puerto);
                 return true;
             }else return false;
