@@ -1,0 +1,17 @@
+{
+  "type": "service_account",
+  "project_id": "porterointeligente-e1e18",
+  "private_key_id": "6a72873cb232a185f064f8dc70f8537420697d1c",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC/fpHoG6E4IGH0\nxxLdF8lNN3MtKK6/ZWs298O8DZF9lRvBN4bm/LIVrxqCIdu35lzeteb6$
+  "client_email": "firebase-adminsdk-h5rp7@porterointeligente-e1e18.iam.gserviceaccount.com",
+  "client_id": "112771293233395473032",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://accounts.google.com/o/oauth2/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-h5rp7%40porterointeligente-e1e18.iam.gserviceaccount.com"
+}
+
+
+
+
+
