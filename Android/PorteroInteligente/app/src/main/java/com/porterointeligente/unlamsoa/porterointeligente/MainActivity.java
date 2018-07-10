@@ -47,7 +47,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     Button btnVideo;
     Button btnPuerta;
     WebView ViewVideo;
-    TextView textVieww;
+//    TextView textVieww;
     Intent intentService=null;
     //si no se inicializó nunca va a tener estos valores.
     String url="";
@@ -95,7 +95,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         btnAudio=(Button) findViewById(R.id.btnAudio);
         btnPuerta=(Button) findViewById(R.id.btnAbrir);
         ViewVideo=(WebView) findViewById(R.id.viewVideo);
-        textVieww= findViewById(R.id.textView2);
+//        textVieww= findViewById(R.id.textView2);
         ViewVideo.setWebViewClient(new WebViewClient());
         WebSettings settings= ViewVideo.getSettings();
         settings.setSupportZoom(true);
@@ -225,6 +225,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             microfonoActivo=false;
             stopService(intentService);
             intentService=null;
+            btnAudio.setText("PRENDER MIC");
             //apago Notificacion
             mNotifyMgr.cancel(1);
             //mando a Firebase
@@ -235,6 +236,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 intentService.putExtra("ipAudio", ip);
                 intentService.putExtra("puerto", puertoAudio);
                 microfonoActivo = true;
+                btnAudio.setText("APAGAR MIC");
                 myRefMic.setValue("1");
                 lanzarNotificacionMicActivo();
                 startService(intentService);
@@ -327,20 +329,20 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             if(values[2]<-8.7 ){
                 sensores[0]=true;
                 //esta boca abajo
-                textVieww.setText("Apago"+values[0]+"   "+values[1]+"   "+values[2]+"   ");
+//                textVieww.setText("Apago"+values[0]+"   "+values[1]+"   "+values[2]+"   ");
             }else sensores[0]=false;
 
         }else if(sensorType == Sensor.TYPE_PROXIMITY){
             //0=hay objeto,  5 no hay objeto.
             if(event.values[0]==0){
                 sensores[1]=true;
-                textVieww.setText(""+event.values[0]);
+//                textVieww.setText(""+event.values[0]);
             }else sensores[1]=false;
 
         }else if(sensorType == Sensor.TYPE_LIGHT){
             if(event.values[0]==0){
                 sensores[2]=true;
-                textVieww.setText("Sin luz"+event.values[0]);
+//                textVieww.setText("Sin luz"+event.values[0]);
             }else sensores[2]=false;
         }
 
