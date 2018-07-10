@@ -144,7 +144,7 @@ void setup() {
 
   digitalWrite(RELE, HIGH);
 
-  digitalWrite(LED, LOW);
+  digitalWrite(LED, HIGH);
 
   lcd.init();                           // inicializacion del display
   lcd.backlight();                      // backLigth on.
@@ -174,6 +174,8 @@ void setup() {
 }
 
 void loop() {
+ int out =analogRead(LDR)/2;
+  analogWrite(LED,out);
   refresh_LDR();
   check_RFID_Card();
   checkPackageComplete();
@@ -301,6 +303,10 @@ ISR (TIMER1_OVF_vect) {
     }
 
     countAux1Timer++;                // Actualización del display cada 50mS * 3 = 150 mS.
+    pwm_duty++;
+    if (pwm_duty ==255){
+      pwm_duty=0;
+    }
     if (countAux1Timer == 3) {
       countAux1Timer = 0;
       refreshDisplay = true;
@@ -679,8 +685,8 @@ int  pop_Msg_fromQueue(void) {
 void  refresh_LDR(void) {
   if (refreshLDR == true) {
     refreshLDR = false;
+   
     ldrValue = analogRead(LDR);
-
     if (ldrValue < 350) {
       led_state = true;
     }
@@ -701,19 +707,6 @@ void  refresh_LDR(void) {
   }
 }
 //-----------------------------------------------------------------------------//
-void pwm_out(void) {
-  pwm_cont++;
-  if (pwm_cont >= 255) {
-    pwm_cont = 0;
-    digitalWrite(LED, LOW);
-  }
-  if (pwm_cont >= pwm_duty) {
-    digitalWrite(LED, LOW);
-  }
-  else {
-    digitalWrite(LED, HIGH);
-  }
-}
 
 
 

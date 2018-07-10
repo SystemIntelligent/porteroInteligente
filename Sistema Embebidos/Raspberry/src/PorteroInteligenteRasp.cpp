@@ -43,7 +43,7 @@ void *firebases(void *arg) {
 				strncpy(oldBuffer, buffer, sizeof(oldBuffer));
 
 				if (buffer[0] == '1') {
-					cout <<"> Firebases: Abrir Puerta" << endl;
+					cout <<"\n> Firebases: Abrir Puerta" << endl;
 					buffer[0] = '0';
 					snprintf(cmd, sizeof(cmd),"python /home/pi/iot/firebases_sender.py %s", buffer);
 					system(cmd);
@@ -51,7 +51,7 @@ void *firebases(void *arg) {
 					myserie.enviarDatos(OPEN_DOOR + 48, 2, data);
 				}
 				if (buffer[2] == '1') {
-					cout << "> Firebases: Cerrar Puerta" << endl;
+					cout << "\n> Firebases: Cerrar Puerta" << endl;
 					buffer[2] = '0';
 					snprintf(cmd, sizeof(cmd),"python /home/pi/iot/firebases_sender.py %s", buffer);
 					system(cmd);
@@ -59,7 +59,7 @@ void *firebases(void *arg) {
 					myserie.enviarDatos(CLOSE_DOOR + 48, 2, data);
 				}
 				if (buffer[4] == '1') {
-					cout << "> Firebases: abrir mic" << endl;
+					cout << "\n> Firebases: abrir mic" << endl;
 					buffer[4] = '0';
 					snprintf(cmd, sizeof(cmd),"python /home/pi/iot/firebases_sender.py %s", buffer);
 					system(cmd);
