@@ -73,6 +73,8 @@ public class ServicioAudio extends Service {
 //        audio.setSpeakerphoneOn(false);
 
         try {
+            //recupero el sonido en el celular.
+            audio.setMode(AudioManager.MODE_NORMAL);
             audioGroup.clear();
 //            this.finalize();
             this.stopSelf();
@@ -98,7 +100,8 @@ public class ServicioAudio extends Service {
         }else {
             audioGroup.clear();
             try {
-                this.finalize();
+                audioGroup.clear();
+                this.stopSelf();
             } catch (Throwable throwable) {
 
             }

@@ -68,12 +68,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        //obtengo el Shared Preferences de mi aplicacion.
+
         sensores=new boolean[3];
         for(int i=0;i<3;i++){
             sensores[i]=false;
         }
         videoApagadoPorSensores =false;
+        //obtengo el Shared Preferences de mi aplicacion.
         dato= PreferenceManager.getDefaultSharedPreferences(this);
         //Obtengo datos del Shared Preference. El 1 parametro es la clave, el 2 es el valor por defecto si no lo encuentra.
         url=dato.getString("url",url);
@@ -103,17 +104,15 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         settings.setLoadsImagesAutomatically(true);
         cargarVideo(null);
 
-        sensor = (SensorManager) getSystemService(SENSOR_SERVICE);
-
         boolean done;
         done = sensor.registerListener(this, sensor.getDefaultSensor(Sensor.TYPE_ACCELEROMETER), SensorManager.SENSOR_DELAY_NORMAL);
         sensor.registerListener(this,sensor.getDefaultSensor(Sensor.TYPE_PROXIMITY), SensorManager.SENSOR_DELAY_NORMAL);
         sensor.registerListener(this,sensor.getDefaultSensor(Sensor.TYPE_LIGHT), SensorManager.SENSOR_DELAY_NORMAL);
-        if (!done)
-        {
-            Toast.makeText(this, "No soporta Shake", Toast.LENGTH_SHORT).show();
-
-        }else Toast.makeText(this, "Soporta Shake", Toast.LENGTH_SHORT).show();
+//        if (!done)
+//        {
+//            Toast.makeText(this, "No soporta Shake", Toast.LENGTH_SHORT).show();
+//
+//        }else Toast.makeText(this, "Soporta Shake", Toast.LENGTH_SHORT).show();
 
         ValueEventListener postListener = new ValueEventListener() {
             @Override
@@ -128,7 +127,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 }
             }
             @Override
-            //una lectura puede cancelarse si el cliente no tiene permiso para leer datos de una ubicación en la base de datos de Firebase.
+            //una lectura puede cancelarse si el cliente no tiene permiso para leer datos de una ubicación
+            // en la base de datos de Firebase.
             public void onCancelled(DatabaseError databaseError) {
                 // Getting Post failed, log a message
                 Log.w("as", "loadPost:onCancelled", databaseError.toException());
@@ -141,9 +141,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     }
 
     public void config(View view){
-        Intent intent=new Intent(this,SetUrl.class);
-        intent.putExtra("ip",ip);
-        startActivityForResult(intent,1);
+            Intent intent=new Intent(this,SetUrl.class);
+            intent.putExtra("ip",ip);
+            startActivityForResult(intent,1);
     }
 
     public void AbrirCerrar(View view){
@@ -208,8 +208,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         this.videoActivo=true;
         ViewVideo.setVisibility(View.VISIBLE);
         ViewVideo.loadUrl(url);
-//        AudioManager audio = (AudioManager)getSystemService(AUDIO_SERVICE);
-//        audio.setSpeakerphoneOn(true);
     }
 
     protected void apagarVideo(){
@@ -217,8 +215,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         videoActivo=false;
         ViewVideo.setVisibility(View.INVISIBLE);
         ViewVideo.stopLoading();
-//        AudioManager audio = (AudioManager)getSystemService(AUDIO_SERVICE);
-//        audio.setSpeakerphoneOn(false);
     }
     public void PresionAudio(View view){
         if(intentService==null){
@@ -257,12 +253,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 .setSmallIcon(R.drawable.icono)
                 .setContentTitle("Portero Microfono Activado")
                 .setContentText("Microfono activado hacia el portero.")
-                .setVibrate(new long[] {100, 250, 100, 500})
+//                .setVibrate(new long[] {100, 250, 100, 500})
                 .setAutoCancel(false);  //con esto le digo que no se cierre al apretar en la notificacion
         mBuilder.setOngoing(true); //con esto hago que no se pueda cerrar la notificacion.
 
-        mNotifyMgr.notify(1, mBuilder.build());
-
+        mNotifyMgr.notify(1, mBuilder.build());//EJECUTO LA NOTIFICACION. con id 1
     }
 
 
@@ -283,7 +278,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         mBuilder2.setPriority(1);
         mBuilder2.setOngoing(true); //con esto hago que no se pueda cerrar la notificacion.
 
-        mNotifyMgr.notify(2, mBuilder2.build());
+        mNotifyMgr.notify(2, mBuilder2.build()); //EJECUTO LA NOTIFICACION. con id 1
 
     }
     @Override
@@ -354,13 +349,14 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 apagarVideo();
                 videoApagadoPorSensores=true;
             }
+            btnPuerta.setVisibility(View.INVISIBLE);
 
         }else{
             if(videoActivo==false && videoApagadoPorSensores==true){
                 prenderVideo();
                 videoApagadoPorSensores=false;
             }
-
+            btnPuerta.setVisibility(View.VISIBLE);
         }
     }
 
